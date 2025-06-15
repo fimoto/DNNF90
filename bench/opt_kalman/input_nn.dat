@@ -1,0 +1,40 @@
+### PINN benchmark [kdv] KdV: u = sech^2(0.5(x-t)), x in [-8,8], t in [0,2]
+## Optimizer comparison, third member: the extended Kalman filter.
+## bench/opt_simple, bench/opt_ngd and bench/opt_kalman are the same
+## problem, data, network and seed; only the method and the epoch budget
+## differ.  The residual is nonlinear (A u u_x), which is the case the
+## filter observes through kf_update_resid rather than as a linear
+## functional of the carried derivatives.
+## GD_param: p1 = initial covariance diagonal, p2 = initial forgetting
+## factor, p3 = its schedule.
+Rand_seed    20260728 / fixed seed (reproducibility)
+Output_deriv 1 /
+Init_w       LeCun_unif
+Restart      0 /
+Nlayer       4 / L
+2 /
+16 /
+16 /
+1 /
+###
+Loss_term  DATA         100  data.dat           1.d0 /
+Loss_term  COLLOCATION     200  colloc.dat         0.2d0 /
+###
+Residual 3 /
+LIN   1.d0        0 1 /  u_t
+UUX   3.d0        1 0 /  A u u_x (A=3)
+LIN   1.d0        3 0 /  u_3x
+Exact_solution 1 /
+Hod_check 1 /
+###
+Num_validation 30 /
+Validation_cyc 100 /
+P_max          1000000 /
+###
+Epoch      1000 /
+Activation TANH /
+Conv       1.d-14 /
+Num_batch  270 /
+Checkpoint_cyc         100000 /
+GD_method  KALMAN
+GD_param   1.d-3 0.995d0 0.9999d0 0.d0 0.d0 /

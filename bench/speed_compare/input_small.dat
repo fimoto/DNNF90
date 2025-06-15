@@ -1,0 +1,26 @@
+### Framework comparison input: 7 layers, width 768, float64, full batch.
+### Protocol (see measure.sh): steady-state epoch cost from the 5<->50
+### epoch slope, all implementations interleaved in one session.
+Output_deriv 0 /
+Init_w       Random_unif
+Rand_seed    20260729 /
+Restart      0 /
+Nlayer       7 / L
+1  /
+10 /
+10 /
+10 /
+10 /
+10 /
+1  /
+Loss_term  DATA         200  train.dat          1.d0 /
+Num_validation 10 /
+Validation_cyc 100 /
+P_max          500 /
+Epoch      3000 /
+Activation TANH /
+Conv       1.d-30 /
+Num_batch  190 /
+Checkpoint_cyc         1000 /
+GD_method  Simple
+GD_param   0.1d0 0.d0 0.d0 0.d0 0.d0 /

@@ -1,0 +1,99 @@
+Note: The following floating-point exceptions are signalling: IEEE_UNDERFLOW_FLAG IEEE_DENORMAL
+### init_hod_tables
+###   D0=4  K=5
+###   NUM_alpha (multi-indices carried) = 39
+###   Bell table terms                  = 235
+###   restricted to closure of 11 seed indices
+### Residual as parsed (imposed as R = 0 at every collocation point)
+###   axes are written x1..x4, with axis 4 shown as t (Time_axis)
+###   term      coefficient  expression                    slot  multi-index
+###    1      1.000000E+00  u_t                               5    0  0  0  1
+###    2      1.360800E+01  u * u_x1                          2    1  0  0  0
+###    3      3.438367E+00  u_x1x1x1                         12    3  0  0  0
+###    4      3.438367E+00  u_x1x2x2                         15    1  2  0  0
+###    5      3.438367E+00  u_x1x3x3                         17    1  0  2  0
+###    6     -5.397751E-01  u_x1x1x1x1x1                     34    5  0  0  0
+###    7     -1.079550E+00  u_x1x1x1x2x2                     35    3  2  0  0
+###    8     -1.079550E+00  u_x1x1x1x3x3                     36    3  0  2  0
+###    9     -5.397751E-01  u_x1x2x2x2x2                     37    1  4  0  0
+###   10     -1.079550E+00  u_x1x2x2x3x3                     38    1  2  2  0
+###   11     -5.397751E-01  u_x1x3x3x3x3                     39    1  0  4  0
+###
+### PINN residual training enabled
+Residual terms (after DXLAP expansion)  11
+Exact_solution  1
+Time_axis  4
+### High-order derivative (HOD) training enabled
+Hod_K  5
+Hod_lambda(0:K)    0.100E+01  0.100E+01  0.100E+01  0.100E+01  0.100E+01  0.100E+01
+Hod_alpha_file  NONE
+Hod_check  1
+Task  TRAIN
+Average_cyc_mpi  1
+Shuffle  0
+Shuffle_cyc_mpi  1000000
+Output_deriv  1
+Restart  0
+
+********************
+Network Construction
+Nlayer  4
+           4
+           8
+           8
+           1
+********************
+Number of weight parameters  121
+
+All input  330
+Training  300
+Validation  30
+********************
+Label_start & Label_end
+           1         180
+         181         330
+Ndata_train_set(i) & label_end(i)-label_start(i)+1
+         180         180
+         150         150
+********************
+Early Stopping
+NUM_validation  30
+val_cyc  100
+p_max: maximum patience for early stopping  1000000
+********************
+Epoch  30000
+Conv    0.10E-13
+********************
+Regularization
+********************
+
+Activation  TANH           
+
+Sample number in a minibatch (Mbatch)  300
+
+Output Cycle (OC)  100000
+Initialization  LECUN_UNIF     
+GD_method  ADAM                          
+GD_param     0.0010000000   0.9000000000   0.9990000000   0.0000000100   0.0000000000   0.0000000000
+GD_ratio
+   1.0000000000
+   0.0010000000
+
+#############################################
+### HOD self-check
+### [REF] hod_golden.dat not found: skipped
+###     worst slot 10 of order 2:  T, FD = -0.134821E-02 -0.134821E-02
+### [dX] input FD check (|alpha|<=2): max rel |T - FD| =   0.51263E-08
+### [dX] passed
+### [dW] weight-gradient FD check: 43 weights, max relative error =   0.18414E-10
+### [dW] passed
+### [dW-R] PINN residual-gradient FD check: 43 weights, max relative error =   0.34757E-09
+### [dW-R] passed
+### HOD self-check: ALL PASSED
+#############################################
+start from total epoch: istart_step=  0
+ best epoch=       29900   7.0786776634825351E-008
+ writing output_set*.dat for 330 points
+             231.259[s]
+     3.854[min]
+     0.064[h]

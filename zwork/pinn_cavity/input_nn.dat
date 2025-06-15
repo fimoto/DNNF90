@@ -1,0 +1,65 @@
+### The lid-driven cavity at Re = 100, the standard first test of a
+### flow PINN.  Two inputs, three field components, three residuals:
+###
+###   R1  u_x + v_y                                        = 0
+###   R2  u u_x + v u_y + p_x - nu ( u_xx + u_yy )          = 0
+###   R3  u v_x + v v_y + p_y - nu ( v_xx + v_yy )          = 0
+###
+### with nu = U L / Re = 0.01 and rho = 1.  The advection terms multiply
+### one component by the derivative of another, which is what the System
+### block exists for.
+###
+### The boundary condition prescribes u and v on the four walls and says
+### nothing about the pressure, so Sys_wcomp gives the pressure a weight
+### of zero in the supervised term.  Fitting it to a boundary value it
+### does not have would over-constrain the problem; the pressure is
+### determined by the momentum equations up to a constant, which is all
+### the physics fixes.
+Init_w       Glorot_norm
+Rand_seed    20260820 /
+Restart      0 /
+Output_deriv 0 /
+
+Nlayer       5 /
+2 / (x, y)
+40 /
+40 /
+40 /
+3 / (u, v, p)
+
+Loss_term  DATA         1000  data.dat    1.d0  /
+Loss_term  COLLOCATION  4000  colloc.dat  1.d-2 /
+
+Sys_wcomp  1.d0 1.d0 0.d0 /   the wall data says nothing about p
+
+System 3 12 /
+TRM  1  1   1 0   1.d0    /   u_x
+TRM  1  2   0 1   1.d0    /   v_y
+XUX  2  1 1 1 0   1.d0    /   u * u_x
+XUX  2  2 1 0 1   1.d0    /   v * u_y
+TRM  2  3   1 0   1.d0    /   p_x  (rho = 1)
+TRM  2  1   2 0  -1.d-2   /   -nu u_xx
+TRM  2  1   0 2  -1.d-2   /   -nu u_yy
+XUX  3  1 2 1 0   1.d0    /   u * v_x
+XUX  3  2 2 0 1   1.d0    /   v * v_y
+TRM  3  3   0 1   1.d0    /   p_y
+TRM  3  2   2 0  -1.d-2   /   -nu v_xx
+TRM  3  2   0 2  -1.d-2   /   -nu v_yy
+
+Hod_K      2 /
+1.d0
+0.d0
+0.d0
+Hod_dense  1 /
+
+Hod_check  0 /
+Num_validation 200 /
+Validation_cyc 100 /
+P_max          20000 /
+Epoch      2000 /
+Activation TANH /
+Conv       1.d-14 /
+Num_batch  100 /
+Checkpoint_cyc 100000 /
+GD_method  Adam
+GD_param   0.002d0 0.9d0 0.999d0 1.d-8 0.d0 /

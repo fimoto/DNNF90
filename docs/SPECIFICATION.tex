@@ -1,0 +1,1577 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage{amsmath,amssymb}
+\usepackage[margin=22mm]{geometry}
+\usepackage{enumitem}
+\usepackage{booktabs,longtable,array}
+\usepackage{xcolor}
+\definecolor{linkblue}{RGB}{20,60,140}
+\usepackage[colorlinks=true,linkcolor=linkblue]{hyperref}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\mi}[1]{\boldsymbol{#1}}
+
+\title{DNNF90 Specification\\[1mm]
+{\large High-order partial-derivative propagation through neural networks\\
+by multi-index partial Bell polynomials --- v1.4}}
+\date{August 2026}
+\author{}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\bigskip
+
+%=====================================================================
+\section{Overview}
+
+\subsection{Purpose and position}
+
+DNNF90 is a Fortran 90/95 library that constructs the output of a
+fully connected neural network together with its \textbf{mixed partial
+derivatives of arbitrary order} in a single forward pass, and returns
+the exact weight gradient of any loss built from those derivatives in a
+single reverse pass. The core is the recursion for high-order
+derivatives of composite functions organized by multi-index partial
+Bell polynomials; no nested automatic differentiation and no finite
+differences are used.
+
+The software is released under the MIT license. It has two layers.
+
+\begin{itemize}[leftmargin=1.4em]
+\item \textbf{The library} (\code{lib/}): the embeddable mechanism.
+      One-point evaluation, one-point seeded gradients, one optimizer
+      step applied to a caller-owned array, committee estimation,
+      Kalman-filter training, and the C bindings.
+\item \textbf{The training application} (\code{app/}): the
+      keyword-driven reference implementation. Minibatches,
+      validation, early stopping, eleven optimizers, file I/O, MPI.
+\end{itemize}
+
+The boundary follows the separation of mechanism from policy
+(Section~\ref{sec:boundary}).
+
+\subsection{Scope}
+
+\begin{itemize}[leftmargin=1.4em]
+\item The hidden activation is $\tanh$ only, because the derivative
+      tables are built from the Bell polynomials of $\tanh$.
+\item The output layer is linear (identity) with a single output; the
+      propagated derivatives are those of a linear read-out of the
+      last hidden layer.
+\item The input dimension $D_0$ and the maximum order $K$ are given in
+      the input. The carried multi-index set is either dense (all
+      $|\mi{\alpha}|\le K$) or the downward closure of a prescribed
+      seed set.
+\item The loss lives outside the library. The library receives
+      $\partial L/\partial T_{\mi\alpha}$ (the \emph{seed} below) and
+      returns $\partial L/\partial W$.
+\end{itemize}
+
+%=====================================================================
+\section{Mathematical specification}
+
+\subsection{Notation}
+
+Layers $l=1,\dots,L$, width $n_l$ of layer $l$, weights
+$W^{(l)}_{ji}$ ($i=0$ is the bias). Input
+$\mi{x}\in\mathbb{R}^{D_0}$. Multi-index
+$\mi\alpha=(\alpha_1,\dots,\alpha_{D_0})$,
+$|\mi\alpha|=\sum_i\alpha_i$. The carried quantities are
+
+\[
+T^{(l,\mi\alpha)}_j \;=\; \frac{\partial^{|\mi\alpha|} z^{(l)}_j}{\partial x_1^{\alpha_1}\cdots \partial x_{D_0}^{\alpha_{D_0}}},
+\qquad
+S^{(l,\mi\alpha)}_j \;=\; \frac{\partial^{|\mi\alpha|} a^{(l)}_j}{\partial \mi{x}^{\mi\alpha}},
+\]
+where $a^{(l)}=W^{(l)}z^{(l-1)}$ and $z^{(l)}=\sigma(a^{(l)})$
+($\sigma=\tanh$; the last layer is the identity).
+
+\subsection{Forward propagation (high order)}
+\label{sec:fwd}
+
+The linear part is linear multi-index by multi-index:
+\[
+S^{(l,\mi\alpha)}_j \;=\; \sum_{i} W^{(l)}_{ji}\,T^{(l-1,\mi\alpha)}_i ,
+\qquad
+T^{(0)}_0 \equiv 1 \ (\text{the bias channel}).
+\]
+The nonlinear part is the high-order derivative of a composition,
+expressed through the multi-index partial Bell polynomials
+$B_{\mi\alpha,q}$:
+\[
+T^{(l,\mi\alpha)}_j \;=\; \sum_{q=1}^{|\mi\alpha|} \sigma^{(q)}\!\big(S^{(l,\mi 0)}_j\big)\;
+B_{\mi\alpha,q}\big(S^{(l,\cdot)}_j\big),
+\]
+where $B_{\mi\alpha,q}$ is a polynomial in the lower multi-index
+components of $S$, built by the recursion
+$B_{\mi\alpha,q}=\sum_{\mi\beta} c_{\mi\alpha\mi\beta}\,S^{(\mi\beta)}B_{\mi\alpha-\mi\beta,q-1}$.
+The coefficients $c$ and the referenced indices are tabulated once at
+initialization. The input layer carries $T^{(1,\mi 0)}_j=x_j$,
+$T^{(1,\mi e_j)}_j=1$, and zero otherwise.
+
+\subsection{High-order derivatives of $\tanh$}
+
+$\sigma^{(q)}$ closes as a polynomial in $t=\tanh$:
+$\sigma^{(0)}=t$ and
+$\sigma^{(q+1)}=(1-t^2)\,\mathrm{d}\sigma^{(q)}/\mathrm{d}t$,
+carried as a recursion on coefficient arrays, so that
+$q=0,\dots,K+1$ costs one polynomial evaluation per point.
+
+\subsection{Reverse propagation (adjoint)}
+
+Let the seed of a loss $L$ be
+$\bar T^{(L,\mi\alpha)}_1=\partial L/\partial T^{(L,\mi\alpha)}_1$.
+The adjoint quantities are
+\[
+\bar S^{(l,\mi\beta)}_j=\sum_{\mi\alpha} \bar T^{(l,\mi\alpha)}_j\, h^{(l)}_{j,\mi\alpha\mi\beta},
+\qquad
+\bar T^{(l-1,\mi\alpha)}_i=\sum_j W^{(l)}_{ji}\,\bar S^{(l,\mi\alpha)}_j,
+\]
+\[
+\frac{\partial L}{\partial W^{(l)}_{ji}}=\sum_{\mi\alpha}\bar S^{(l,\mi\alpha)}_j\,T^{(l-1,\mi\alpha)}_i .
+\]
+$h$ is assembled from the $\sigma^{(q+1)}$ values saved in the forward
+pass paired with the Bell tables. The gradient is accumulated in a
+fused per-layer sweep as soon as $\bar S^{(l)}$ is complete, so
+$\bar T,\bar S$ hold only one layer's plane at a time.
+
+\subsection{Closure sets}
+
+Given a seed multi-index set $\mathcal{A}$, the set actually carried is
+its \textbf{downward closure}
+$\{\mi\beta \mid \exists \mi\alpha\in\mathcal{A},\ \mi\beta\le\mi\alpha\}$.
+A non-closed set does not close the recursion. The dense set
+$|\mi\alpha|\le K$ is a special case of a closure. Indexing is
+lexicographic order with binary search (\code{find\_alpha}), which
+remains viable at fifty to a hundred descriptors.
+
+%=====================================================================
+\section{Software structure}
+
+\subsection{The layer boundary: mechanism and policy}
+\label{sec:boundary}
+
+The library provides \textbf{mechanism}: evaluate one point, form one
+point's weight gradient from a seed, apply one step to a caller-owned
+array. The trainer holds \textbf{policy}: batch size, validation
+cadence, stopping rules, file output.
+
+The boundary is forced by the embedding cases. Density-functional and
+molecular-dynamics host codes own their outer loop, their data flow
+and their parallel decomposition, so a library that imposes an epoch
+loop, a validation split or a checkpointing policy cannot be embedded.
+Mechanism can stay pure and reentrant (one work space per thread is
+the only requirement) and admits exact verification by finite
+differences; no comparable check exists for a stopping rule. The
+optimizer asymmetry (two rules in \code{lib/}, eleven in \code{app/})
+follows from the same principle. The relationship mirrors that of
+PyTorch proper to Lightning; \code{app/} ships as the library's
+largest worked example.
+
+\subsection{File layout}
+
+\begin{longtable}{@{}p{0.30\textwidth}p{0.10\textwidth}p{0.54\textwidth}@{}}
+\toprule
+File & Lines & Role \\
+\midrule
+\endhead
+\multicolumn{3}{@{}l}{\textbf{lib/} (the embeddable library)}\\
+\code{multi\_index\_bell\_module} & 677 & multi-index generation, downward closure, Bell tables, high-order $\tanh$ derivatives, lexicographic indexing, table sets (\code{tabset\_t})\\
+\code{net\_module}       & 322 & create/read/write/free of \code{net\_t}, evaluation work space, \code{net\_eval\_hod}\\
+\code{train\_module}     & 400 & \code{net\_forward\_point} / \code{net\_backward\_point} / \code{net\_grad\_point}, the batch gradient \code{net\_grad\_batch}, gradient accumulators, \code{opt\_sgd\_step} / \code{opt\_adam\_step}\\
+\code{committee\_module} & 105 & uncertainty estimation by a committee of networks\\
+\code{kalman\_module}    & 239 & per-pattern extended-Kalman-filter training\\
+\code{c\_api\_module} + \code{dnnf90.h} & 479 & the C bindings (22 functions)\\
+\midrule
+\multicolumn{3}{@{}l}{\textbf{app/} (the keyword-driven trainer)}\\
+\code{global\_variables}  & --- & shared state\\
+\code{io\_module}         & --- & input parsing, data reading, output formats\\
+\code{lib\_net\_module}   & 210 & the lib network the trainer holds; weight synchronization and the entry points\\
+\code{pinn\_module}       & 59  & residual evaluation and residual seeds (policy)\\
+\code{init\_weight\_module} & --- & eight initializations\\
+\code{optimizer\_module}  & --- & eleven optimizers\\
+\code{sgd\_batch\_module} & --- & epoch loop, minibatches, early stopping, MPI averaging\\
+\code{validation\_module} & --- & validation costs, RMSE/MAE, output\\
+\code{hod\_check\_module} & --- & in-run finite-difference self-check\\
+\code{api\_module}        & --- & Fortran API onto the trainer state\\
+\bottomrule
+\end{longtable}
+
+\subsection{The synchronization invariant}
+
+Because the trainer owns the master weight array, the invariant
+``the library network must hold the current weights'' arises. It is
+enforced mechanically, not by discipline: every write to \code{weight}
+and \code{weight\_best} advances a generation counter, each
+synchronization records the generation and the source array, and every
+evaluation entry point compares the two before computing and stops on
+a mismatch. The check is one integer comparison and stays enabled in
+production builds, because a missed synchronization returns
+\emph{plausible numbers computed from the previous weights} --- the
+most dangerous failure mode this layer has.
+
+\subsection{Uniqueness of the propagation engine}
+
+There is \textbf{exactly one} propagation engine in the tree.
+Training, the validation cost, the prediction output, the self-check
+and the C API all pass through \code{net\_forward\_point} /
+\code{net\_backward\_point} / \code{net\_grad\_batch}. The trainer
+keeps its own weight array as the master copy (checkpoints, restarts,
+MPI averaging and the optimizer states are expressed in it);
+\code{lnet\_sync\_weights} copies it into the library network once per
+batch iteration and at every point where the weights can have moved
+(just before validation, at output writing, inside the
+finite-difference loops of the self-check).
+
+The entry points of \code{app/lib\_net\_module.f90}:
+
+\begin{longtable}{@{}p{0.32\textwidth}p{0.62\textwidth}@{}}
+\toprule
+Entry & Meaning \\
+\midrule
+\endhead
+\code{lnet\_sync\_weights(w)} & copy the trainer's weights into the library network\\
+\code{lnet\_forward\_value(x,v)} & one point's value\\
+\code{lnet\_forward\_hod(x,t)} & one point's value and all carried derivatives, into the caller's array \code{t}\\
+\code{lnet\_nalpha()} & the number of carried multi-indices (so the caller can size arrays)\\
+\code{lnet\_value\_grad(x,y,c,$\nabla$)} & accumulate one point's value-fit weight gradient\\
+\code{lnet\_seed\_grad(seed,$\nabla$)} & accumulate the adjoint of an arbitrary seed\\
+\code{lnet\_seed\_row(seed,row)} & write the adjoint of an arbitrary seed as one row (the natural-gradient metric)\\
+\code{lnet\_value\_row(row)} & the row of a unit seed on the value component\\
+\code{lnet\_batch\_grad(X,Y,c,$\nabla$)} & the value-fit gradient of a whole minibatch at once\\
+\bottomrule
+\end{longtable}
+
+%=====================================================================
+\section{Library API}
+\label{sec:libapi}
+
+\code{lib/} is the embeddable mechanism and is usable independently of
+the training application; this section describes everything it
+exposes. \code{make lib} builds the static library
+(\code{build/libdnnf90.a}); \code{make shared} the shared one. From
+Fortran, \code{.mod} files are compiler- and version-specific, so
+embeddings that cross toolchains should use the C bindings
+(Section~\ref{sec:capi}).
+
+\subsection{The contract}
+
+The training contract is per point:
+\[
+\text{\code{net\_grad\_point}}:\quad
+\underbrace{\text{seed}_{\mi\alpha}=\frac{\partial L}{\partial T^{\mi\alpha}}}_{\text{assembled by the caller}}
+\ \longmapsto\
+\frac{\partial L}{\partial W}
+\]
+The content of the loss $L$, the chain rule from descriptors to
+inputs, and the meaning of grids or collocation points all belong to
+the caller; the library does not know them. There is no shared state,
+and one work space per thread suffices for concurrent calls (the
+library is built with \code{-frecursive}).
+
+\subsection{\code{multi\_index\_bell\_module}: multi-indices and tables}
+
+\begin{longtable}{@{}p{0.36\textwidth}p{0.58\textwidth}@{}}
+\toprule
+Element & Role \\
+\midrule
+\endhead
+\code{init\_hod\_tables(D0,K,ns,seeds)} & build the shared tables. \code{ns=0}: the dense set ($|\mi\alpha|\le K$); \code{ns>0}: the downward closure of the seed set\\
+\code{tabset\_t} & a table-set type; several networks can carry different multi-index sets at once\\
+\code{tabset\_init}, \code{tabset\_from\_current}, \code{tabset\_free} & construct a table set (fresh, or copied from the shared tables) and free it\\
+\code{alpha\_index(alpha)} & slot number of a multi-index (lexicographic order + binary search)\\
+\code{alpha\_list}, \code{alpha\_deg}, \code{ind\_e1} & the list of multi-indices, their orders, the slots of the unit multi-indices $\mi{e}_i$\\
+\code{NUM\_alpha}, \code{HOD\_D0}, \code{HOD\_KMAX} & the carried count and the $D_0$, $K$ of construction\\
+\code{hod\_tables\_ready} & whether the shared tables are built\\
+\code{tanh\_derivs\_hod}, \code{tanh\_derivs\_ts} & $\tanh^{(q)}$ for $q=0..K{+}1$ by recursion\\
+\code{write\_alpha\_order(file)} & write the multi-index ordering to a file\\
+\code{bell\_*}, \code{pair\_*}, \code{fq\_*} & the Bell, adjoint and forward coefficient tables (internal structure, but public)\\
+\bottomrule
+\end{longtable}
+
+\subsection{\code{net\_module}: networks and evaluation}
+
+\begin{longtable}{@{}p{0.36\textwidth}p{0.58\textwidth}@{}}
+\toprule
+Element & Role \\
+\midrule
+\endhead
+\code{net\_t} & the network type (layer count, widths, weights, a reference to its table set)\\
+\code{net\_init(nt,L,ndim,ts)} & construction; \code{ts} decides the carried multi-index set\\
+\code{net\_load}, \code{net\_save} & read/write in the \code{nn\_weight.dat} format\\
+\code{net\_free} & release; derived types are not auto-released through \code{intent(OUT)}, so always call it\\
+\code{work\_t}, \code{work\_init}, \code{work\_free} & the evaluation work space, one per thread\\
+\code{net\_eval\_hod(nt,wk,x,t)} & one point's value and all carried derivatives (the inference path)\\
+\bottomrule
+\end{longtable}
+
+\subsection{\code{train\_module}: training}
+
+\begin{longtable}{@{}p{0.36\textwidth}p{0.58\textwidth}@{}}
+\toprule
+Element & Role \\
+\midrule
+\endhead
+\code{twork\_t}, \code{twork\_init}, \code{twork\_free} & the adjoint work space (holds the forward pass's intermediates)\\
+\code{grad\_t}, \code{grad\_init}, \code{grad\_free} & the gradient accumulator; optimizer moments live here too\\
+\code{grad\_zero}, \code{grad\_add} & zeroing and addition; \code{grad\_add} is the thread-parallel reduction\\
+\code{net\_forward\_point(nt,tw,x,t)} & one point's forward pass; returns all carried derivatives and keeps the adjoint intermediates\\
+\code{net\_backward\_point(nt,tw,seed,g)} & the adjoint of a seed, accumulated into \code{g}\\
+\code{net\_grad\_point(nt,tw,x,seed,g)} & the two above in one call\\
+\code{bwork\_t}, \code{bwork\_init}, \code{bwork\_free} & the batch work space (carries a batch axis)\\
+\code{net\_grad\_batch(nt,bw,X,Y,c,g)} & the batch gradient of a value fit; three matrix products per layer\\
+\code{opt\_sgd\_step}, \code{opt\_adam\_step} & one step applied to a caller-owned array\\
+\bottomrule
+\end{longtable}
+
+\subsection{\code{kalman\_module}: extended-Kalman-filter training}
+
+A training route separate from gradient descent, used directly from
+the library or a host code (the application's Kalman option in
+\code{GD\_method} is the trainer-side counterpart). It is the method
+in standard use for high-dimensional neural-network potentials of the
+n2p2 family.
+
+One update presents one scalar observable (an energy, or one force
+component the host has chained into descriptor space) and applies the
+rank-one form; no matrix is inverted:
+\begin{align*}
+\xi &= y_{\rm obs} - \hat y, &
+\mi{P}\mi{j} &= \mi{P}\,\mi{j}, &
+\mi{K} &= \frac{\mi{P}\mi{j}}{\lambda + \mi{j}^{\!\top}\mi{P}\mi{j}},\\
+\mi{w} &\leftarrow \mi{w} + \mi{K}\xi, &
+\mi{P} &\leftarrow \frac{\mi{P}-\mi{K}(\mi{P}\mi{j})^{\!\top}}{\lambda}, &
+\lambda &\leftarrow \lambda_0\lambda + 1 - \lambda_0 .
+\end{align*}
+The Jacobian row $\mi{j}=\partial\hat y/\partial\mi{w}$ comes from
+\code{net\_grad\_point} with a unit seed on the observed slot, so
+\textbf{any carried derivative can be the observable}, Hessian
+components included.
+
+The covariance $\mi{P}$ is quadratic in the number of weights. That is
+the method's intended regime: a small network updated very few times
+per pattern (the usual trade against SGD/Adam).
+
+\begin{longtable}{@{}p{0.36\textwidth}p{0.58\textwidth}@{}}
+\toprule
+Element & Role \\
+\midrule
+\endhead
+\code{kalman\_t} & the filter type ($\mi{P}$, forgetting factor $\lambda$, $\lambda_0$)\\
+\code{kf\_num\_weights(nt)} & the state dimension, for sizing $\mi{P}$\\
+\code{kf\_init(kf,nt,P0,lam,lam0)} & construction; $\mi{P}_0$ is the diagonal initial value\\
+\code{kf\_update(kf,nt,tw,g,x,islot,y)} & update on the observation of slot \code{islot} at point \code{x} with value \code{y}\\
+\code{kf\_update\_obs(kf,nt,j,xi)} & the form taking the Jacobian row and residual directly, for callers that assemble their own chain rule\\
+\code{kf\_free} & release\\
+\bottomrule
+\end{longtable}
+
+As verification, \code{libverify\_example} confirms that Kalman
+training on a linear network reproduces the ridge-regression
+normal-equation solution to machine precision (measured
+$5\times10^{-13}$).
+
+\subsection{\code{committee\_module}: uncertainty by committee}
+
+Returns the spread of several networks' predictions at the same input
+as an uncertainty indicator. The intended use trains the members
+separately (for instance with different \code{Rand\_seed}) and bundles
+them at evaluation.
+
+\begin{longtable}{@{}p{0.36\textwidth}p{0.58\textwidth}@{}}
+\toprule
+Element & Role \\
+\midrule
+\endhead
+\code{committee\_t} & the committee type (a set of member references)\\
+\code{comm\_init}, \code{comm\_free} & construction and release\\
+\code{comm\_eval} & mean and spread at one point\\
+\bottomrule
+\end{longtable}
+
+\subsection{\code{blas\_wrap\_module}}
+
+A single entry, \code{bgemm}: the $\alpha=1,\beta=0$ matrix product
+behind an explicit interface. The library's work spaces are pointer
+components, whose elements cannot be sequence-associated to the
+assumed-size dummies of the implicit BLAS interface, so callers hand
+whole arrays to this wrapper. Built without \code{USE\_BLAS} it falls
+back to reference loops.
+
+\subsection{The C bindings}
+\label{sec:capi}
+
+\code{lib/c\_api\_module.f90} and \code{lib/dnnf90.h} provide 22
+functions. They avoid the \code{.mod} incompatibility, so embeddings
+that cross toolchains use these.
+
+\begin{longtable}{@{}p{0.42\textwidth}p{0.52\textwidth}@{}}
+\toprule
+Function group & Role \\
+\midrule
+\endhead
+\code{dnnf90\_tables\_init\_dense}, \code{dnnf90\_tables\_init\_closure} & shared tables (dense / closure)\\
+\code{dnnf90\_tabset\_dense}, \code{dnnf90\_tabset\_closure}, \code{dnnf90\_tabset\_nderiv} & table sets and carried-count query\\
+\code{dnnf90\_net\_create}, \code{dnnf90\_net\_create\_ts}, \code{dnnf90\_net\_set\_layer}, \code{dnnf90\_net\_load}, \code{dnnf90\_net\_free} & network construction, layer setup, loading, release\\
+\code{dnnf90\_work\_create}, \code{dnnf90\_work\_free}, \code{dnnf90\_twork\_create}, \code{dnnf90\_twork\_free} & work spaces (evaluation / adjoint)\\
+\code{dnnf90\_grad\_create}, \code{dnnf90\_grad\_zero}, \code{dnnf90\_grad\_free} & gradient accumulators\\
+\code{dnnf90\_eval} & one-point evaluation\\
+\code{dnnf90\_grad\_point} & one point's weight gradient from a seed\\
+\code{dnnf90\_adam\_step} & one step\\
+\code{dnnf90\_nderiv}, \code{dnnf90\_alpha} & carried-count and multi-index queries\\
+\bottomrule
+\end{longtable}
+
+C wrappers for the committee and the Kalman filter are not provided
+(Section~\ref{sec:limits}).
+
+%=====================================================================
+\section{Input specification (\code{input\_nn.dat})}
+
+\subsection{Format conventions}
+
+\begin{itemize}[leftmargin=1.4em]
+\item One key per line, \code{KEY value ... /}; everything after
+      \code{/} is ignored as a remark.
+\item A leading \code{\#} or \code{!} makes a comment line.
+\item Key names are case-insensitive, and so are the named values
+      (\code{Task}, \code{Activation}, \code{Init\_w},
+      \code{GD\_method}, the \code{Loss\_term} form names, the
+      residual term names, the NGD schedule names).
+\item If a key appears more than once, \textbf{the later line wins}.
+\item Key order is free. The only exceptions are the keys that need
+      \code{Nlayer} first (\code{Loss\_term}, \code{Residual},
+      \code{Time\_axis}); appearing before \code{Nlayer} they stop
+      the run.
+\item A word not in the parser's branches is skipped with the warning
+      \code{input WARNING: unrecognized keyword ignored:}. A retired
+      key is \emph{not} skipped: it stops the run and states its
+      migration path.
+\end{itemize}
+
+\subsection{Required keys and defaults}
+
+Only five keys are required: \code{Nlayer}, \code{Init\_w},
+\code{Loss\_term}, \code{GD\_method}, \code{GD\_param}. High-order
+fitting or collocation adds \code{Hod\_K} and \code{Residual}.
+Everything else has a default. The smallest input is:
+
+\begin{verbatim}
+Init_w     Glorot_norm
+Nlayer     3 /
+1 /
+8 /
+1 /
+Loss_term  DATA  200  train.dat  1.d0 /
+Epoch      200 /
+GD_method  Adam
+GD_param   0.01d0 0.9d0 0.999d0 1.d-8 0.d0 /
+\end{verbatim}
+
+\subsection{Network and training}
+
+\begin{longtable}{@{}p{0.27\textwidth}p{0.13\textwidth}p{0.54\textwidth}@{}}
+\toprule
+Key & Default & Meaning \\
+\midrule
+\endhead
+\code{Nlayer L /} & required & layer count; the $L$ lines that follow give one width each. Layer 1 is the input dimension $D_0$; the last layer must be 1\\
+\code{Activation TANH /} & \code{TANH} & hidden activation. Anything but \code{TANH} stops the run, since the derivative tables are built from the Bell polynomials of $\tanh$ (see Section~\ref{sec:activation} for the other tabulated activations)\\
+\code{Init\_w NAME} & required & \code{Glorot\_unif}, \code{Glorot\_norm}, \code{He\_unif}, \code{He\_norm}, \code{LeCun\_unif}, \code{LeCun\_norm}, \code{Random\_unif}, \code{Random\_norm}. The first six set the variance from the fan-in (or fan-in and fan-out). \code{Random\_*} is a fixed width-independent range ($\pm 0.05$, or $\sigma=0.05$), under which deep networks lose both signal and gradient\\
+\code{Rand\_seed n /} & 0 (clock) & random seed; always set it for reproducibility\\
+\code{Restart n /} & 0 & 1 resumes from the weights in \code{nn\_weight.dat}; the optimizer state is also restored when \code{gd\_*.dat} exists (Section~\ref{sec:restart})\\
+\code{Task TRAIN|PREDICT|COMMITTEE /} & \code{TRAIN} & \code{PREDICT} reads \code{nn\_weight.dat}, writes the output files and exits. \code{COMMITTEE} evaluates a set of trained networks and exits (Section~\ref{sec:committee}). Neither produces history, checkpoints or optimizer logs\\
+\code{Epoch n /} & 1000 & maximum epoch count\\
+\code{Num\_batch n /} & $\min(10,N_{\rm train})$ & minibatch size; outside $[1,N_{\rm train}]$ the run stops\\
+\code{Shuffle n /} & 0 & 1 redraws the training points each epoch\\
+\code{Num\_validation n /} & 0 & points held out for validation; outside $[0,N_{\rm input}-1]$ the run stops. At 0 the validation cost is undefined and early stopping reads the training cost\\
+\code{Validation\_cyc n /} & 1 & validation cadence (epochs); the history holds one line per validation\\
+\code{P\_max n /} & effectively infinite & the early-stopping patience: the run stops after this many validations without improvement. By default there is no early stop\\
+\code{Conv x /} & 0 (off) & stop when the training cost falls below this\\
+\code{Checkpoint\_cyc n /} & 1000 & cadence of \code{checkpoint\_ep*.dat}\\
+\code{Output\_deriv n /} & 0 & 1 writes the model's first derivatives after training; in a value-fit-only run the dense $K=1$ table is built automatically\\
+\code{Hod\_check n /} & 0 & 1 runs the in-run self-check before training (Section~\ref{sec:verify})\\
+\code{Average\_cyc\_mpi n /} & 1 & weight-averaging cadence under MPI\\
+\code{Shuffle\_cyc\_mpi n /} & $10^6$ & training-point redistribution cadence under MPI\\
+\bottomrule
+\end{longtable}
+
+\subsection{Choosing the activation}
+\label{sec:activation}
+
+The adjoint reaches order $K+1$, so the activation must be
+$C^{K+1}$. Among functions that satisfy this, \textbf{how fast the
+high-order derivatives grow} differs greatly, and this directly
+controls the conditioning of the carried slots. Measuring
+$\max_a|\sigma^{(q)}(a)|$ over $a\in[-6,6]$:
+
+\begin{center}
+\begin{tabular}{@{}lrrrrl@{}}
+\toprule
+Activation & $q=2$ & $q=4$ & $q=6$ & $q=8$ & parity \\
+\midrule
+\code{TANH}    & 0.77 & 4.0  & 50   & 1220  & odd \\
+\code{ERF}     & 0.96 & 4.4  & 36   & 454   & odd \\
+\code{SIN}     & 1.0  & 1.0  & 1.0  & 1.0   & odd \\
+\code{BESSEL}  & 0.50 & 0.375& 0.31 & 0.273 & even \\
+\code{BESSEL1} & 0.41 & 0.334& 0.288& 0.257 & odd \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\code{SIN} has $\sigma^{(q)}(a)=\sin(a+q\pi/2)$, bounded by one at
+every order. \code{BESSEL} ($J_0$) and \code{BESSEL1} ($J_1$) have
+derivatives given by the binomial combination
+\[
+J_\nu^{(q)}(a)=\frac{(-1)^q}{2^q}\sum_{k=0}^{q}(-1)^k\binom{q}{k}J_{\nu+q-2k}(a)
+\]
+and are likewise bounded, since $|J_n|\le1$ at every order. $J_0$ is
+even, so the layer loses the sign of its preactivation; $J_1$ is odd
+with the same boundedness.
+
+Only the \code{BESSEL} family uses externally derived code: the four
+routines \code{jyna} etc.\ of Zhang and Jin live in
+\code{lib/bessel\_module.f90} with their copyright notice preserved
+(see \code{LICENSE}). The original routines treat negative arguments
+as $x=0$, so a wrapping layer applies the reflection
+$J_n(-x)=(-1)^nJ_n(x)$ --- preactivations are of course signed, and
+omitting this would make half the layer return the constant $J_0=1$.
+
+For \code{ERF}, only the value uses the Fortran 2008 intrinsic
+\code{ERF}, and that single file is excluded from
+\code{make f95check}. The derivatives are the Hermite functions
+$\mathrm{erf}^{(q)}(a)=\frac{2}{\sqrt\pi}(-1)^{q-1}H_{q-1}(a)e^{-a^2}$,
+carried by the three-term recursion $\psi_{n+1}=2a\psi_n-2n\psi_{n-1}$
+(with $\psi_n=H_ne^{-a^2}$), so no bare polynomial is formed and
+nothing overflows.
+
+The oscillatory activations (\code{SIN}, \code{BESSEL},
+\code{BESSEL1}) can use \code{Init\_w SIREN}: an initialization that
+places the preactivations inside one period, with
+\code{Init\_w\_omega} (default 30) as the frequency. The optimum
+depends on the input range; on the shipped example with inputs in
+$[-1,1]$, 12 works and 30 does not.
+
+\subsection{Evaluating a high-order fit}
+\label{sec:hodmetric}
+
+A single coefficient of determination pooled over all carried slots
+is useless at large $K$. On the shipped $K=7$ example (330 slots) the
+mean square of the targets is nearly flat across orders
+($0.04$--$0.07$) while the predictions blow up at high order, so one
+number hides the structure.
+
+\code{bench/post/hod\_accuracy.py} reports two dimensionless
+quantities per order,
+\[
+\mathrm{rel}(p)=\frac{\|T_{\rm pred}-y\|_p}{\|y\|_p},\qquad
+\mathrm{amp}(p)=\frac{\|T_{\rm pred}\|_p}{\|y\|_p},
+\]
+where $\mathrm{rel}\ge1$ means the order carries no information and
+$\mathrm{amp}\gg1$ means it diverges. Rankings use the relative error
+in the loss norm, $\|T-y\|_\lambda/\|y\|_\lambda$.
+
+Measured this way, the activations differ structurally at $K=7$:
+\code{TANH} reaches $\mathrm{amp}=14.7$ at order seven --- the
+prediction swings fifteen times the target --- against 4.7 for
+\code{SIN}, 5.2 for \code{BESSEL}, 3.9 for \code{BESSEL1}.
+
+\paragraph{What $\lambda_p$ does.}
+The shipped example uses $\lambda_p=1/(p!)^2$, so order seven carries
+weight $4\times10^{-8}$: the high orders are barely optimized at all.
+Re-measuring at $\lambda_p=1$ (equal weight across orders) changes the
+picture entirely.
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+ & \multicolumn{2}{c}{$\mathrm{rel}(7)$} & rel.\ error, loss norm \\
+Activation & $\lambda_p=1/(p!)^2$ & $\lambda_p=1$ & $\lambda_p=1$ \\
+\midrule
+\code{TANH}   & 14.57 & 1.05 & 1.010 \\
+\code{SIN}    &  4.33 & 0.45 & 0.377 \\
+\code{BESSEL} &  5.04 & 0.31 & 0.221 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Equal weighting tames the order-seven divergence for every
+activation, but \code{TANH} then sits at $\mathrm{rel}\approx1$
+\textbf{at every order}, with $\mathrm{amp}$ collapsed to
+$0.05$--$0.47$: asked to actually deliver high orders, the $\tanh$
+network degenerates to the mean everywhere. \code{BESSEL} holds
+$\mathrm{rel}=0.12$--$0.31$ and $\mathrm{amp}\approx0.9$ at every
+order.
+
+``The high orders do not fit'' is therefore not an activation problem
+alone but also a loss-design problem --- $\lambda_p$ may be throwing
+the high orders away. In settings that genuinely demand them, the
+boundedness of the activation's high-order derivatives is decisive.
+
+\subsection{Loss terms and their data files}
+
+\subsubsection{The form of the loss}
+
+The loss is a weighted sum of terms. One \code{Loss\_term} line
+declares one term; terms are numbered in order of appearance (the
+number that appears in the output file names).
+\[
+L=\sum_{t} w_t\, L_t,\qquad
+L_t=\frac{1}{2}\sum_{n\in t}\begin{cases}
+\big(N(\mi{x}_n)-y_n\big)^2 & \text{DATA}\\[2pt]
+\displaystyle\sum_{\mi\alpha}\lambda_{|\mi\alpha|}\big(T^{\mi\alpha}(\mi{x}_n)-y_{n,\mi\alpha}\big)^2 & \text{HOD\_DATA}\\[2pt]
+R(\mi{x}_n)^2 & \text{COLLOCATION}
+\end{cases}
+\]
+$w_t$ is the fourth argument of the \code{Loss\_term} line.
+$\lambda_{|\mi\alpha|}$ is the \textbf{per-order} weight, and
+$\lambda_0$ multiplies the value itself ($\mi\alpha=\mi 0$): a run
+with a single \code{HOD\_DATA} term already contains a value fit
+whenever $\lambda_0>0$. Conversely, $\lambda_0=0$ leaves the value
+unconstrained --- a function whose derivatives fit but whose constant
+is free: on \code{zwork/hod\_4d\_k3}, switching $\lambda_0$ from 1 to
+0 drops the value's coefficient of determination from $0.985$ to
+$-17.1$.
+
+\subsubsection{What each form requires}
+
+This table narrows down what a given problem needs.
+
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Form & Required keys & Data columns & Use \\
+\midrule
+\code{DATA} & none & $D_0+1$ & supervised values, boundary conditions \\
+\code{HOD\_DATA} & \code{Hod\_K} & $D_0+N_\alpha$ & supervised derivatives \\
+\code{COLLOCATION} & \code{Residual} (\code{Hod\_K} optional) & $D_0$ + extra columns & points where the equation is imposed \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+$D_0$ is the number of input variables (the first width after
+\code{Nlayer}); $N_\alpha$ the number of carried multi-indices
+(Section~\ref{sec:nalpha}). Data files are read list-directed, so
+\textbf{records are numbers only} --- comment lines are not skipped.
+A record may wrap across lines (tokens are counted). Lines beyond the
+\code{n} of \code{Loss\_term} are not read.
+
+\subsubsection{Worked examples}
+
+\paragraph{A value fit (\code{DATA}).}
+$D_0=1$, $y=x^2+1$ at 200 points; one record is the two numbers $x$
+and $y$.
+
+\begin{verbatim}
+--- input_nn.dat ---            --- train.dat (200 lines) ---
+Nlayer     4 /                  -0.99004975124378  1.98019850993787
+1 /   <- D0 = 1                 -0.98009950248756  1.96059503477637
+12 /                            ...
+12 /
+1 /
+Loss_term  DATA  200  train.dat  1.d0 /
+\end{verbatim}
+
+\paragraph{A derivative fit (\code{HOD\_DATA}).}
+$D_0=4$, $K=3$, dense set, so $N_\alpha=35$. One record is
+$4+35=39$ numbers: $\mi{x}$ first, then the 35 targets in multi-index
+order. Note that the $K+1$ lines directly after \code{Hod\_K} are
+$\lambda_0,\dots,\lambda_K$ (they are continuation lines belonging to
+\code{Hod\_K}; no other key may be interposed).
+
+\begin{verbatim}
+--- input_nn.dat ---
+Nlayer     4 /
+4 /   <- D0 = 4
+10 /
+10 /
+1 /
+Hod_K      3 /      <- K = 3 ; the next K+1 = 4 lines are the lambdas
+1.d0                <- lambda_0 : multiplies the value
+1.d0                <- lambda_1 : multiplies the first derivatives
+1.d0                <- lambda_2
+1.d0                <- lambda_3
+Hod_dense  1 /      <- the dense set |alpha| <= K
+Loss_term  HOD_DATA  400  train.dat  1.d0 /
+
+--- train.dat (400 records, 39 numbers each) ---
+ 0.989957667989E+00 -0.774791878492E-01 -0.168822326093E+00  0.269057713255E+00  ...
+ |<---------------- x(1:4) ---------------->|<-- y_alpha(1:35) ...
+\end{verbatim}
+
+\paragraph{Points where the equation is imposed (\code{COLLOCATION}).}
+$D_0=2$. The residual contains \code{SRC} and
+\code{Exact\_solution 1} is set, so one record is $\mi{x}$ (2
+numbers), the source $f$, and the exact solution $u^*$, \textbf{in
+that order} --- 4 numbers. The exact solution is for reporting only;
+it does not enter the loss.
+
+\begin{verbatim}
+--- input_nn.dat ---
+Loss_term  DATA         160  data.dat     1.d0  /  <- boundary conditions
+Loss_term  COLLOCATION  400  colloc.dat   1.d-3 /  <- interior points
+Residual 3 /
+LIN   1.d0    2 0 /
+LIN   1.d0    0 2 /
+SRC  -1.d0        /   <- declares that colloc.dat has an f column
+Exact_solution 1 /    <- declares that colloc.dat has a u* column
+
+--- colloc.dat (400 records, 4 numbers each) ---
+  6.91978764042226e-01  9.36279743968240e-01 -3.23261059769365e+00  1.63765966006543e-01
+  |<------- x(1:2) ------->|<---- f(x) ---->|<---- u*(x) ---->|
+
+--- data.dat (160 records, 3 numbers each: DATA, so x and y) ---
+  1.25000000000000e-02  0.00000000000000e+00  0.00000000000000e+00
+  |<------- x(1:2) ------->|<--- y = 0 --->|
+\end{verbatim}
+
+The extra columns exist \textbf{only when declared}. Without
+\code{SRC} there is no $f$ column; with \code{Exact\_solution 0}
+(the default) no $u^*$ column. The smallest collocation file is the
+$D_0$ columns of $\mi{x}$ alone.
+
+\subsubsection{The carried multi-index set and $N_\alpha$}
+\label{sec:nalpha}
+
+Writing a \code{HOD\_DATA} file requires knowing $N_\alpha$ and the
+\textbf{column order} first. The set is decided as follows.
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Condition & Carried set & $N_\alpha$ \\
+\midrule
+\code{Hod\_dense 1} & all $|\mi\alpha|\le K$ & $\binom{D_0+K}{K}$ \\
+\code{Hod\_alpha\_file} given & the downward closure of the seed set & decided at run time \\
+\code{COLLOCATION} only & the closure of the residual's multi-indices & decided at run time \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For the dense set, $N_\alpha$ is computable in advance ($D_0=4,K=3$
+gives $\binom{7}{3}=35$). The order is \textbf{ascending in
+$|\mi\alpha|$}, lexicographic within an order. Every run writes
+\code{hod\_alpha\_order.dat}, which is the definition of the column
+order.
+
+\begin{verbatim}
+--- hod_alpha_order.dat  (D0 = 4, K = 3) ---
+# ia  |alpha|  alpha(1:D0)
+1  0   0 0 0 0      <- the value
+2  1   1 0 0 0      <- d/dx1
+3  1   0 1 0 0      <- d/dx2
+4  1   0 0 1 0
+5  1   0 0 0 1
+6  2   2 0 0 0      <- d^2/dx1^2
+...
+\end{verbatim}
+
+\paragraph{The theory of closures.}
+A multi-index set $\mathcal{A}$ is \textbf{downward closed} when
+$\mi\alpha\in\mathcal{A}$ and $\mi\beta\le\mi\alpha$ (componentwise)
+imply $\mi\beta\in\mathcal{A}$. The carried set must be closed
+because of the recursion's structure: the Bell part of
+Section~\ref{sec:fwd} builds $T^{\mi\alpha}$ from $S^{\mi\beta}$ and
+$B_{\mi\alpha-\mi\beta,q-1}$ with $\mi\beta\le\mi\alpha$, and the
+adjoint reads $h_{\mi\alpha-\mi\beta}$; an index whose sub-indices
+are absent cannot be computed at all.
+
+The closure of a seed set $\mathcal{S}$ is
+\[
+\mathrm{cl}(\mathcal{S})=\bigcup_{\mi\alpha\in\mathcal{S}}
+\mathrm{box}(\mi\alpha),\qquad
+\mathrm{box}(\mi\alpha)=\{\mi\beta:\mi\beta\le\mi\alpha\},\qquad
+|\mathrm{box}(\mi\alpha)|=\prod_{i=1}^{D_0}(\alpha_i+1),
+\]
+a union of boxes, so
+$|\mathrm{cl}(\mathcal{S})|\le\sum_{\mi\alpha}\prod_i(\alpha_i+1)$
+with equality for disjoint boxes; the exact count follows by
+inclusion--exclusion.
+
+Take the shipped \code{zwork/hod\_4d\_k7\_active} ($D_0=4$). The
+seeds are $(7,0,0,0)$, $(0,0,0,1)$, $(2,2,1,0)$, with box sizes $8$,
+$2$, $3\cdot3\cdot2=18$. The intersection
+$\mathrm{box}(7,0,0,0)\cap\mathrm{box}(2,2,1,0)=\{(k,0,0,0):k\le2\}$
+has $3$ elements; the other pairwise and the triple intersections are
+all $\{\mi 0\}$ with $1$. Hence
+\[
+|\mathrm{cl}(\mathcal{S})|=8+2+18-3-1-1+1=24 .
+\]
+The run reports exactly $N_\alpha=24$ --- under 7\% of the dense
+$\binom{4+7}{7}=330$. Since the cost is $O(L\,n^2 N_\alpha)$, that
+ratio is exactly the gain in speed and memory a closure buys.
+
+In a \code{COLLOCATION}-only run, no seed file is needed:
+\textbf{the residual's multi-indices are the seeds automatically}.
+The \code{bench/kdv} residual contains $u_t$, $u\,u_x$, $u_{xxx}$,
+i.e.\ $(0,1)$, $(1,0)$, $(3,0)$, whose closure is the five indices
+$\{(0,0),(1,0),(2,0),(3,0),(0,1)\}$ --- half the dense
+$\binom{5}{3}=10$, as the run also reports.
+
+\paragraph{Ordering.}
+The column order is ascending order of $|\mi\alpha|$, and within an
+order it is the generation order of non-decreasing axis combinations
+(with repetition): choosing axis $i$ once adds one to $\alpha_i$, so
+at order 2 with $D_0=4$ the tuples
+$(1,1),(1,2),(1,3),(1,4),(2,2),\dots$ produce
+$\mi\alpha=(2,0,0,0),(1,1,0,0),(1,0,1,0),(1,0,0,1),(0,2,0,0),\dots$
+A closure \textbf{keeps that generation order and drops the absent
+indices}, so a closure preserves the dense set's relative order.
+Indexing is a binary search on the lexicographic order
+(\code{find\_alpha}), which this ordering underwrites.
+
+\paragraph{Getting the column order without a run.}
+\code{tools/alpha\_order.py} reproduces the same enumeration, byte
+for byte against \code{hod\_alpha\_order.dat}, so data files can be
+prepared before any run.
+
+\begin{verbatim}
+# the dense set
+tools/alpha_order.py --d0 4 --k 3
+
+# a closure (a seed file in the Hod_alpha_file format)
+tools/alpha_order.py --d0 4 --seeds zwork/hod_4d_k7_active/alpha_seeds.dat
+
+# just the count
+tools/alpha_order.py --d0 10 --k 3 --count      ->  286
+\end{verbatim}
+
+The three shipped variants (dense $D_0{=}4,K{=}3$, a seed closure, a
+residual-derived closure) are verified byte-identical against the
+run's \code{hod\_alpha\_order.dat}. Running once to obtain the order
+therefore still works, but is not necessary.
+
+A record with the wrong column count is caught at read time; the run
+stops stating the measured and the required counts:
+
+\begin{verbatim}
+ read_data: record 1 of train.dat
+   accumulates 59 values where ndim(1)+NUM_alpha = 39 are required:
+   a line is missing a value
+   (x(1:ndim(1)) then y_alpha for every carried multi-index)
+\end{verbatim}
+
+Because tokens are counted, a short record \textbf{eats into the next
+line} before the mismatch is noticed; the ``measured'' number is the
+accumulated count after the boundary slipped, not the token count of
+one line.
+
+\subsubsection{Key list}
+
+\begin{longtable}{@{}p{0.32\textwidth}p{0.62\textwidth}@{}}
+\toprule
+Key & Meaning \\
+\midrule
+\endhead
+\code{Loss\_term FORM n file w /} & declare one loss term. \code{FORM} is \code{DATA}, \code{HOD\_DATA} or \code{COLLOCATION}; \code{n} the record count to read, \code{file} the data file, \code{w} the term weight ($w\ge 0$; negative stops). At most 100 terms\\
+\code{Hod\_K K /} & the maximum carried order $K$. \textbf{The next $K+1$ lines} hold $\lambda_0,\dots,\lambda_K$, one per line. Required for \code{HOD\_DATA}; optional for \code{COLLOCATION}-only runs, where the residual's highest order becomes $K$. An explicit $K$ smaller than the residual's order stops the run\\
+\code{Hod\_dense n /} & 1 forces the dense set $|\mi\alpha|\le K$. At 0 (default) the closure is built from the \code{Hod\_alpha\_file} seeds and the residual's multi-indices; however, a \code{HOD\_DATA} term without \code{Hod\_alpha\_file} implies the dense set, since the data columns correspond to all multi-indices\\
+\code{Hod\_alpha\_file f /} & the seed multi-index file: first line the count, then one $\mi\alpha(1{:}D_0)$ per line\\
+\bottomrule
+\end{longtable}
+
+\subsection{Residuals (collocation)}
+
+\begin{longtable}{@{}p{0.32\textwidth}p{0.62\textwidth}@{}}
+\toprule
+Key & Meaning \\
+\midrule
+\endhead
+\code{Residual m /} & define the residual operator in the next $m$ lines, each one of the four kinds below. At most 64 terms after expansion\\
+ & \quad \code{LIN c a1..aD /} \quad $c\,T^{\mi\alpha}$ (a linear term)\\
+ & \quad \code{UUX c a1..aD /} \quad $c\,u\,T^{\mi\alpha}$ ($c\,u^2$ when $\mi\alpha=\mi0$)\\
+ & \quad \code{DXLAP c k [ix] /} \quad $c\,\partial_{ix}\nabla^{2k}u$. The Laplacian runs over every non-time axis and expands multinomially into several linear terms. \code{ix} defaults to axis 1; a time-axis \code{ix} stops the run. At most 16 \code{DXLAP} lines\\
+ & \quad \code{SRC c /} \quad $c\,f(\mi{x})$ (the source, read per collocation point; at most once)\\
+\code{Time\_axis n /} & the index of the time axis; default the last axis, and every shipped case follows that convention. \code{DXLAP} expands after the whole input is read, so this key may appear anywhere\\
+\code{Exact\_solution n /} & 1 reads the collocation file's last column as the exact solution and adds the error to the output; it never enters the loss\\
+\bottomrule
+\end{longtable}
+
+The residual is evaluated pointwise as
+$R=\sum_k c_k\,[u]\,T^{\mi\alpha_k}+c_{\rm src}f$, and the seed is
+$\partial L/\partial T^{\mi\alpha}= w\,R\,\partial R/\partial
+T^{\mi\alpha}$; the source is additive and does not appear in
+$\partial R/\partial T^{\mi\alpha}$. Residual evaluation and seed
+construction are argument-only functions with no shared state.
+
+A collocation run writes the parsed residual back to the log head in
+human-readable form. The operator is the one quantity in the input
+with nothing to cross-check against --- a mistyped multi-index just
+solves a different equation correctly --- so this echo is the only
+defence:
+
+\begin{verbatim}
+### Residual as parsed (imposed as R = 0 at every collocation point)
+###   axes are written x1..x2, with axis 2 shown as t (Time_axis)
+###   term      coefficient  expression                    slot  multi-index
+###    1      1.000000E+00  u_t                               3    0  1
+###    2      3.000000E+00  u * u_x1                          2    1  0
+###    3      1.000000E+00  u_x1x1x1                          5    3  0
+\end{verbatim}
+
+The last column is the slot of the carried multi-index, checkable
+against \code{hod\_alpha\_order.dat}.
+
+\subsection{Coupled systems (the \code{System} block)}
+\label{sec:system}
+
+The scalar \code{Residual} block writes one residual of one field.
+\textbf{Systems of residuals over several field components} ---
+incompressible Navier--Stokes, or a charge density coupled to a
+potential --- are written with the \code{System} block. The output
+width $m$ becomes the number of field components (the scalar form's
+width-1 constraint is lifted when \code{System} is present), and
+training carries every derivative of every component to order $K$.
+
+Each term is a product of at most four derivative factors,
+\[
+  c\;\partial^{\mi\gamma}u_{k}\;\partial^{\mi\beta}u_{i}\;\partial^{\mi\alpha}u_{j},
+\]
+and the four term kinds are its cases: \code{TRM} one factor,
+\code{XUX} two with the first undifferentiated ($\mi\beta=\mi0$),
+\code{DXD} two differentiated factors, \code{TRP} three. With one
+component and \code{ic = jc = 1} they reduce to \code{LIN}/\code{UUX},
+so existing inputs keep their meaning.
+
+\begin{longtable}{@{}p{0.46\textwidth}p{0.48\textwidth}@{}}
+\toprule
+Key & Meaning \\
+\midrule
+\endhead
+\code{System nres nterm /} & define \code{nres} residuals ($\le 16$) in the next \code{nterm} lines ($\le 256$). \code{ir} is the residual a term belongs to; \code{jc}, \code{ic}, \code{kc} are component indices\\
+\code{TRM ir jc a1..aD c /} & $c\,\partial^{\mi\alpha}u_{jc}$ (linear)\\
+\code{XUX ir ic jc a1..aD c /} & $c\,u_{ic}\,\partial^{\mi\alpha}u_{jc}$: advection $u\,u_x+v\,u_y$, charge transport by a flow, the body force $\rho E$ --- the terms coupled systems need and the scalar form cannot write\\
+\code{DXD ir ic b1..bD jc a1..aD c /} & $c\,\partial^{\mi\beta}u_{ic}\,\partial^{\mi\alpha}u_{jc}$ (a product of derivatives). Flux divergences need it: in $\nabla\!\cdot\!(\rho\nabla\phi)=\nabla\rho\!\cdot\!\nabla\phi+\rho\,\nabla^2\phi$ the first term is a product of first derivatives of different components\\
+\code{TRP ir kc g1..gD ic b1..bD jc a1..aD c /} & $c\,\partial^{\mi\gamma}u_{kc}\,\partial^{\mi\beta}u_{ic}\,\partial^{\mi\alpha}u_{jc}$ (three factors), needed by the compressible momentum flux $\rho u u_x$ or field-dependent mobilities\\
+\code{QAD ir lc d1..dD kc g1..gD ic b1..bD jc a1..aD c /} & $c\,\partial^{\mi\delta}u_{lc}\,\partial^{\mi\gamma}u_{kc}\,\partial^{\mi\beta}u_{ic}\,\partial^{\mi\alpha}u_{jc}$ (four factors), the quartic nonlinearity of the higher dispersive hierarchies: the seventh-order Lax equation carries $140\,u^3u_x$\\
+\code{Sys\_src /} & declares that the collocation file carries \textbf{one source column per residual}, between the coordinates and the exact solutions. Omit for a homogeneous system, whose file is that much narrower; a mistaken setting stops with a record-length error --- the check working as intended\\
+\code{Sys\_wcomp w1..wm /} & per-component weights of the supervised loss (default all 1). Mandatory for components of different magnitudes: an unweighted sum of squares is a statement about the largest component only. The custom is to measure $1/\lVert y_i\rVert^2$ from the data, as the shipped cases do\\
+\code{Sys\_wres w1..wr /} & per-residual weights of the collocation loss (default all 1), for the same reason. Reads \code{nres} values, so it must follow \code{System}\\
+\code{Sys\_rnoise r1..rr /} & per-residual observation noise for the extended Kalman filter. Exact, not approximate: scaling both the observation row and the innovation by $1/\sqrt{r}$ reproduces noise $r$ on the original quantity exactly. A residual with an outsized source produces outsized innovations, and a filter trusting all observations equally spends its covariance on that residual; raising its noise says ``this observation is less trustworthy''. Must follow \code{System}\\
+\code{Sys\_balance cyc alpha /} & every \code{cyc} epochs, readjust \code{Sys\_wres} so that each residual contributes comparably to the gradient. Each residual's own gradient norm is sampled on up to 40 training points, and each weight moves a fraction $\alpha$ toward $g_{\max}/g_{ir}$ (the running average keeps it from chasing one batch's noise). The weights are printed at each readjustment\\
+\bottomrule
+\end{longtable}
+
+The system data formats: \code{data.dat} is
+$\mi{x}(1{:}D_0)\;y(1{:}m)$; \code{colloc.dat} is $\mi{x}(1{:}D_0)$,
+then one source per residual if \code{Sys\_src}, then all components'
+exact solutions if \code{Exact\_solution 1}. The reader counts
+values, so a column slip stops with a record-length error rather than
+propagating silently.
+
+Residual evaluation (\code{calc\_sys\_residual}) and seed
+construction (\code{set\_sys\_seed}) are argument-only functions,
+like the scalar form. Each factor of a product contributes to the
+seed by the product rule; the adjoint of that is checked against
+finite differences for one to three factors by
+\code{tools/example\_product\_adj.f90} ($9.5\times10^{-12}$), and for
+the four-factor form by the in-run check of \code{zwork/pinn\_lax7}
+($2.0\times10^{-10}$), and the
+multi-output forward and adjoint by
+\code{tools/example\_multiout*.f90} ($2.2\times10^{-10}$,
+$9.1\times10^{-12}$).
+
+The shipped examples are \code{zwork/pinn\_lax7} (the seventh-order Lax equation, whose quartic term needs the four-factor form; exact solitary wave, table read back to $1.1\times10^{-14}$), \code{zwork/pinn\_lax} (Lax's fifth-order
+equation: a scalar case whose terms $30u^2u_x$ and $20u_xu_{xx}$ need
+the product language; exact soliton, term table read back
+independently to $8\times10^{-16}$),
+\code{zwork/pinn\_kovasznay} (Kovasznay flow; exact solution, term
+table verified against an independent implementation to $10^{-15}$),
+\code{zwork/pinn\_cavity} (the Re$=100$ cavity, compared with the
+Ghia benchmark profiles), and \code{zwork/pinn\_ehd} (a
+five-component electrohydrodynamic system; manufactured solution).
+
+\subsection{Uncertainty by committee}
+\label{sec:committee}
+
+\code{Task COMMITTEE} uses \code{committee\_module}
+(Section~\ref{sec:libapi}) from the trainer. Members are
+independently trained networks and cannot be produced in one run
+(usually the same input is trained under different \code{Rand\_seed}
+and each \code{nn\_weight.dat} saved under its own name). This task
+reads them and writes, for every input point, \textbf{the mean and
+sample standard deviation of every carried slot}, then exits. The
+point is that the spread of the \emph{derivatives} is available, not
+just of the value: with \code{Output\_deriv 1} the dense first-order
+set is carried, so the spread of $\partial N/\partial x_i$ is
+reported too --- exactly the quantity an on-the-fly scheme
+thresholds when deciding whether to call the expensive
+first-principles calculation.
+
+\begin{longtable}{@{}p{0.30\textwidth}p{0.64\textwidth}@{}}
+\toprule
+Key & Meaning \\
+\midrule
+\endhead
+\code{Committee m /} & the next $m$ lines name the members' weight files, one per line, $m\ge 2$. Members must share the multi-index set the current input defines; a slot-count mismatch stops the run\\
+\bottomrule
+\end{longtable}
+
+The output is \code{output\_committee\_set<4 digits>.dat}: one line
+is $\mi{x}(1{:}D_0)$, all slots' means, all slots' standard
+deviations. At the end the spread over the whole input set is
+summarized per slot (mean and maximum). The shipped example is
+\code{zwork/tour\_committee} (\code{train\_members.sh} trains four
+members; \code{committee.dat} evaluates them).
+
+\subsection{Optimizers}
+
+\begin{longtable}{@{}p{0.30\textwidth}p{0.64\textwidth}@{}}
+\toprule
+Key & Meaning \\
+\midrule
+\endhead
+\code{GD\_method NAME} & the eleven gradient rules \code{SIMPLE}, \code{SIMPLE\_SCHEDULE}, \code{SIMPLE\_GMAXCLIP}, \code{MOMENTUM}, \code{NESTEROV}, \code{ADAGRAD}, \code{ADADELTA}, \code{RMSPROP}, \code{RMSPROP\_NESTEROV}, \code{ADAM}, \code{NATURAL\_GRAD}; the non-gradient \code{KALMAN}; and the quasi-Newton \code{LBFGS}\\
+\code{GD\_param p1 ... p5 /} & the method's hyperparameters. An independent key, in either order with \code{GD\_method}. All five zero stops the run, since no method can take a step (only \code{LBFGS}, whose line search sets the step, is exempt and may omit \code{GD\_param}). The adaptive rules ($p_2$ for \code{ADAGRAD}, \code{ADADELTA}; $p_3$ for \code{RMSPROP}, \code{RMSPROP\_NESTEROV}; $p_4$ for \code{ADAM}) divide by an accumulator regularized by $\varepsilon$, so a non-positive slot stops the run (a weight with zero first-step gradient would divide by zero)\\
+\bottomrule
+\end{longtable}
+
+$p_1$ is the learning rate for every rule. \code{SIMPLE\_SCHEDULE}
+uses $\eta(t)=p_1/\sqrt{t+1}+p_2$; \code{MOMENTUM} and
+\code{NESTEROV} take $p_2$ as the momentum; \code{ADAM} uses
+$p_2,p_3,p_4$ as $\beta_1,\beta_2,\varepsilon$.
+
+\code{KALMAN} selects the per-pattern extended Kalman filter of
+\code{kalman\_module} (Section~\ref{sec:libapi}) from the trainer.
+Rather than accumulating a gradient and stepping once, it presents
+scalar observations one at a time and lets the rank-one update move
+the weights itself. The observable per loss form: the value for
+\code{DATA}; each carried derivative with
+$\lambda_{|\mi\alpha|}\ne 0$ for \code{HOD\_DATA}; the residual
+(target 0) for \code{COLLOCATION}. The Jacobian row
+$\partial\hat y/\partial\mi{w}$ comes from the same seed path the
+gradient rules use. \code{GD\_param} means: $p_1$ = the diagonal
+initial value of $\mi{P}$; $p_2$ = the initial forgetting factor
+$\lambda$; $p_3$ = the $\lambda_0$ of
+$\lambda\leftarrow\lambda_0\lambda+1-\lambda_0$; the run stops unless
+$p_1>0$ and $0<p_2,p_3\le 1$. $\mi{P}$ is quadratic in the weight
+count, so this is for small networks; the run reports the size at
+startup and refuses above 2\,GB.
+
+\code{Kalman\_gate g /} is the innovation gate (a robust EKF): an
+observation with $\xi^2 > g^2(\lambda + \mi{j}^{\top}\mi{P}\mi{j})$
+has its row and innovation shrunk by the same factor (the same exact
+mechanism as \code{Sys\_rnoise}) until equality --- every rank-one
+step becomes bounded, at the price of absorbing surprising
+observations more slowly. Default 0 (off).
+
+The forgetting factor needs care. $\lambda<1$ re-inflates $\mi{P}$ by
+$1/\lambda$ at every update, so under thousands of updates per epoch
+the gains never decay and the filter can drift off a fitted state
+along the linearization error of a nonlinear residual (observed on
+coupled systems with source terms). With $p_2=p_3=1$ ($\lambda$
+pinned at one) the gains decay as in recursive least squares and the
+filter holds and refines a fitted state (a gentle descent at
+$p_1=10^{-5}$). Forgetting buys initial convergence speed at the cost
+of having no stationary behaviour: use forgetting for cold starts,
+and $\lambda=1$ with small $p_1$ to refine a fitted state.
+\code{Kalman\_iter n /} is the iterated EKF (IEKF): each observation
+is relinearized $n$ times at the running iterate before the
+covariance is updated once (Gauss--Newton on the single-observation
+MAP problem). The measurement on the coupled EHD system is negative
+and worth recording: neutral in the stable regime, and it
+\textbf{amplifies} the divergence in the forgetting regime ($0.44$
+against $0.023$ from the fitted start). Solving thousands of mutually
+contradictory scalar observations each more exactly in sequence
+strengthens the oscillation between them; the removed linearization
+error had been acting as a buffer. The collective cure for this
+failure mode is a simultaneous Gauss--Newton over all observations
+--- that is, full-batch quasi-Newton.
+\code{Kalman\_q q /} adds $q$ to the diagonal of $\mi{P}$ after each
+update: process-noise injection, a stationary behaviour intermediate
+between forgetting (inflating everything) and $\lambda=1$ (gains
+vanishing). Default 0.
+\code{Kalman\_mode DECOUPLED /} replaces the covariance with the
+node-wise block diagonal (bias + fan-in as one block per neuron,
+Puskorius--Feldkamp). The gain denominator
+$\lambda+\mi{j}^{\top}\mi{P}\mi{j}$ stays global; only the
+cross-neuron covariance is dropped. Memory and update cost fall from
+$n_w^2$ to the sum of squared block sizes (measured 87$\times$ per
+epoch on the shipped EHD net), the 2\,GB dense guard no longer
+applies, and force-field widths become reachable. The price is the
+convergence rate: on the KdV bench $1.2\times10^{-7}$ in 0.5\,s where
+the dense filter reaches $7\times10^{-14}$ in about 6\,s; on Poisson
+2D $3.2\times10^{-8}$ in 5.4\,s / 3000 epochs against
+$5.5\times10^{-10}$ in 6.5\,s / 300 --- roughly ten times the epochs
+per decade at a tenth the cost per epoch.
+
+The shipped pair \code{zwork/pinn\_poisson2d} and
+\code{zwork/pinn\_poisson2d\_kalman} differ only in the method (same
+problem, data, network) and measure, against the exact solution:
+
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Method & Epochs & Time & Training cost & RMSE \\
+\midrule
+\multicolumn{5}{@{}l}{\code{zwork/pinn\_poisson2d} (2-D Poisson: linear operator + source)}\\
+Adam   & 20000 & 60 s & $1.1\times10^{-2}$ & $3.1\times10^{-3}$ \\
+Kalman &   300 &  8 s & $4.8\times10^{-9}$ & $1.8\times10^{-5}$ \\
+\midrule
+\multicolumn{5}{@{}l}{\code{bench/opt\_*} (KdV, with the nonlinear term $A u u_x$)}\\
+Simple         & 20000 &  6 s & $2.4\times10^{-3}$ & --- \\
+Natural\_grad  &  3000 & 36 s & $1.5\times10^{-5}$ & --- \\
+Kalman         &  1000 &  6 s & $2.6\times10^{-13}$ & $3.8\times10^{-7}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The KdV residual contains $A\,u\,u_x$ and is not a linear functional
+of the carried derivatives. The filter then receives the residual
+value directly through \code{kf\_update\_resid} (building the
+prediction as $\mathrm{dot}(\text{seed},T)$ via
+\code{kf\_update\_obs} would double-count the quadratic term), so
+\code{bench/opt\_kalman} also verifies the observation path for
+nonlinear operators.
+
+Only the natural gradient carries further keys. The metric is
+$G=\frac{1}{N_b}\big[\sum_n \mi{j}_n\mi{j}_n^{\!\top}+\mu\,\mathrm{tr}(\cdot)I\big]$
+and the update $\Delta W=-\eta(t)G^{-1}(\nabla/N_b)$. The rows
+$\mi{j}_n$ are $\partial u/\partial W$ for \code{DATA} terms (a
+Gauss--Newton metric) and $\partial R/\partial W$ for
+\code{COLLOCATION} terms; for \code{HOD\_DATA} terms the per-point
+loss gradient (an empirical Fisher metric).
+
+\code{LBFGS} is the limited-memory quasi-Newton method: the search
+direction comes from the two-loop recursion over the most recent
+pairs $(\mi{s},\mi{y})$ (verified by
+\code{tools/example\_lbfgs\_check.f90}, $1.3\times10^{-16}$), and the
+step from a backtracking line search on the Armijo condition
+$L(\mi{w}+t\mi{d})\le L(\mi{w})+c_1 t\,\mi{g}\!\cdot\!\mi{d}$. There
+is no learning rate. It is a \textbf{full-batch method}: a pair
+$(\mi{s},\mi{y})$ is meaningful only when consecutive gradients
+belong to the same function, and a redrawn minibatch swaps the
+function at every step; \code{Num\_batch} must therefore equal the
+training count (all points minus \code{Num\_validation}), and the
+input check stops with the required value on violation.
+\code{Lbfgs\_ss /} is self-scaled BFGS (SSBFGS, Oren--Luenberger):
+instead of applying the newest pair's scale
+$s\!\cdot\!y/y\!\cdot\!y$ once to the initial Hessian, every stored
+pair receives its own factor
+$\tau_j = s_j\!\cdot\!y_j/(y_j^{\top}H_j y_j)$ at its own level of
+the recursion. $H_j$ is the operator built from the older pairs, so
+the factors are fixed oldest-first by a nested application of the
+same recursion ($O(m^2 n_w)$ per direction, negligible beside one
+full-batch gradient). With a single stored pair it coincides exactly
+with plain L-BFGS (measured: eight digits over fifty iterations). The
+measured verdict is stated honestly: on the problems of this
+distribution it is slightly worse than plain L-BFGS
+($5.2\times10^{-3}$ against $3.3\times10^{-3}$ at 300 cold EHD
+epochs).
+\code{Lbfgs\_wolfe c2 /} adds the curvature (second Wolfe) condition
+$g(w+t\mi{d})\!\cdot\!\mi{d} \ge c_2\, g(w)\!\cdot\!\mi{d}$
+($c_1 < c_2 < 1$) to the line search: a step that lowers the loss
+while the slope is still steep is rejected and the step is grown
+rather than shrunk (with proper bracketing; each such trial costs a
+gradient instead of a cost evaluation). The default 0 reproduces the
+pure Armijo search exactly. On the problems of this distribution it
+changes nothing --- the first trial $t=1$ already satisfies both
+conditions, so the search was not the limiter; the measurement is
+recorded with the feature.
+
+\code{Lbfgs\_expand n /} is forward tracking: when the first trial
+satisfies Armijo, the step is doubled up to $n$ times and the longest
+step that still satisfies the condition and lowers the loss is taken
+(default 0 reproduces pure backtracking exactly). Measured on the
+EHD cold start it gives a 19\,\% lower loss at equal epochs, but
+loses at equal wall time due to the extra cost evaluations. The
+memory size is \code{Lbfgs\_m n /} (default 8, range $[1,200]$).
+More memory improves the per-epoch quadratic model (the two-loop's
+extra cost is $O(n\,n_w)$): on the five-component EHD cold start the
+objective at 300 epochs measures $6.3\times10^{-3}$ at $m{=}8$
+against $3.3\times10^{-3}$ at $m{=}40$. That case admits
+\textbf{one-shot training from random weights}
+(\code{zwork/pinn\_ehd/input\_cold.dat}: objective
+$3.8\times10^{-4}$ in 900 epochs, about 250 s, $R^2 \ge 0.9975$ in
+all components). If no loss-lowering step is found, the memory is
+discarded and the run proceeds to the next epoch (\code{Lbfgs\_scan /}
+enables extra backtracking before giving up; \code{Lbfgs\_verbose /}
+prints the accepted and the recomputed loss at each exit). The
+objective the line search itself minimizes is recorded in
+\code{lbfgs\_history.dat} (one line = epoch, accepted loss, step,
+trial count, acceptance flag); the training history is a different
+sum common to every update rule and is left alone.
+
+The natural gradient's damping is chosen by \code{Ngd\_damping}:
+\code{TRACE} is $G+\mu\,\mathrm{tr}(G)I$ (relative; its meaning
+depends on the weight count), \code{ABS} is $G+\mu I$ (absolute;
+independent of it --- the one that works at the network sizes coupled
+systems need). Default \code{TRACE}.
+\code{Ngd\_dual /} solves the natural-gradient step through the Gram
+(dual) matrix: the push-through identity
+\[ (\mi{G}+c\mi{I})^{-1}\mi{b}
+   = \tfrac{1}{c}\bigl[\mi{b}
+   - \tfrac{1}{N}\mi{J}^{\top}\mi{K}^{-1}\mi{J}\mi{b}\bigr],
+   \qquad \mi{K}=c\mi{I}+\tfrac{1}{N}\mi{J}\mi{J}^{\top} \]
+(with $\mi{K}$ of row dimension) yields \textbf{the identical step}
+to the dense $n_w\times n_w$ solve at $O(N^2 n_w + N^3)$ (verified
+against the primal route on the EHD case to every printed digit;
+140 s/epoch primal against 0.16 s/epoch dual there). The dense 2\,GB
+guard does not apply to the dual route.
+
+For a system the metric carries \textbf{one row per residual} (one
+per component for a multi-component fit), built with the exact
+$\sqrt{w_r}$ factorization of the weighted objective. A single row
+per point ($\mathrm{d}(\sum_r w_r R_r^2/2)/\mathrm{d}\mi{w}$) would
+collapse the outer product to the rank-one-per-point empirical
+Fisher, blind to how the residuals trade against each other --- the
+very difficulty of a coupled system. With this and the dual solve,
+the natural gradient solves the EHD system from random weights
+(minibatch of 40, $0.743\to2.8\times10^{-4}$ in 900 epochs, about
+150 s, $R^2\ge0.9986$ in all components;
+\code{zwork/pinn\_ehd/input\_cold\_ngd.dat}).
+
+\code{Ngd\_geo h alpha /} is geodesic acceleration
+(Transtrum--Sethna): the second directional derivative of every
+observable along the step $\delta_1$ is measured by one extra
+evaluation, a second solve against \textbf{the same metric} (cheap in
+the dual route) gives the correction $\delta_2$, and
+$\delta_1+\delta_2/2$ is taken when $\lVert\delta_2\rVert/2 \le
+\alpha\lVert\delta_1\rVert$ (an $\eta$-consistent finite difference).
+Measured neutral: within trajectory noise on the problems of this
+distribution, at about twice the cost per epoch.
+
+\code{Ngd\_trust mu0 /} is a Levenberg--Marquardt rule adapting the
+absolute damping from the observed loss change: $\mu\leftarrow\mu/3$
+on descent, $\mu\leftarrow 5\mu$ on ascent, bounded to
+$[10^{-6},10^{8}]$. Setting it forces \code{Ngd\_damping ABS}.
+
+\begin{longtable}{@{}p{0.36\textwidth}p{0.58\textwidth}@{}}
+\toprule
+Key & Meaning \\
+\midrule
+\endhead
+\code{Ngd\_schedule\_eta NAME a b /} & the schedule of $\eta(t)$: \code{NONE} (constant $p_1$), \code{SIMPLE} ($p_1/(1+at)^b$), \code{EXP} ($p_1e^{-at}$)\\
+\code{Ngd\_schedule\_mu NAME a b /} & the schedule of $\mu(t)$; the same three\\
+\code{Ngd\_eta\_bound x /} & lower bound on $\eta$\\
+\code{Ngd\_mu\_bound x /} & lower bound on $\mu$\\
+\bottomrule
+\end{longtable}
+
+%=====================================================================
+\section{Output files}
+
+Everything is written to the run directory; build products collect in
+\code{build/}.
+
+\subsection{The training history \code{history\_ep<start epoch, 7 digits>.dat}}
+
+One line per validation. The file name contains the starting epoch,
+so a restarted run opens a new file rather than appending. The
+leading \code{\#} lines are self-describing. Every metric is
+normalized \textbf{per point}.
+
+Each metric has two channels: the \textbf{value channel} (\code{\_f})
+is the contribution of $N(\mi{x})-y$; the \textbf{derivative/residual
+channel} (\code{\_df}) that of the high-order terms and the
+collocation residuals. The total columns (3--5) are assembled per
+form: \code{DATA} value channel only, \code{COLLOCATION} residual
+channel only, \code{HOD\_DATA} $\lambda_0\cdot$value $+$
+derivatives.
+
+\begin{longtable}{@{}p{0.14\textwidth}p{0.80\textwidth}@{}}
+\toprule
+Columns & Content \\
+\midrule
+\endhead
+1 & epoch\\
+2 & the patience counter (compared with \code{P\_max})\\
+3--5 & total cost: training, validation, all input points\\
+6--9 & cost split: training (value, deriv), validation (value, deriv)\\
+10--11 & all-points cost split (value, deriv)\\
+12--17 & RMSE: training (value, deriv), validation (value, deriv), all points (value, deriv)\\
+18--23 & MAE, same layout\\
+24-- & only with two or more loss terms: 21 columns per term (the layout of 3--23), in order --- 24--44 for term 1, 45--65 for term 2, and so on\\
+\bottomrule
+\end{longtable}
+
+A \code{DATA}+\code{COLLOCATION} run, for instance, has 65 columns
+per line, with the derivative-channel columns of term 1 (\code{DATA})
+zero and the value-channel columns of term 2 (\code{COLLOCATION})
+zero.
+
+\subsection{Predictions}
+
+\begin{longtable}{@{}p{0.36\textwidth}p{0.58\textwidth}@{}}
+\toprule
+File & One line holds \\
+\midrule
+\endhead
+\code{output\_set<4 digits>.dat} & $\mi{x}(1{:}D_0)$, prediction, target. One file per loss term, numbered in \code{Loss\_term} order. For a \code{COLLOCATION} term the target column carries the exact solution (with \code{Exact\_solution 1})\\
+\code{output\_hod\_set<4 digits>.dat} & $\mi{x}(1{:}D_0)$, all predicted carried derivatives $T^{\mi\alpha}(1{:}N_\alpha)$, all targets. Written for \code{HOD\_DATA} terms\\
+\code{output\_deriv\_set<4 digits>.dat} & $\mi{x}(1{:}D_0)$, $\partial N/\partial x_i\,(i=1..D_0)$. Only with \code{Output\_deriv 1}\\
+\bottomrule
+\end{longtable}
+
+Since the last two columns are prediction and target, the quality of
+a fit is one line of arithmetic away. A coefficient of determination
+near one means the model explains the data; near zero it has learned
+nothing beyond the target mean. A model outputting a constant still
+produces smooth, plausible-looking files, so this check is worth
+doing every time.
+
+\subsection{Weights and restarting}
+\label{sec:restart}
+
+\begin{longtable}{@{}p{0.36\textwidth}p{0.58\textwidth}@{}}
+\toprule
+File & Content \\
+\midrule
+\endhead
+\code{nn\_weight.dat} & the best weights (by training cost). Line 1 the best epoch; lines 2--3 reserved fields (activation codes, currently always 0); then the layer count, the widths, and per layer a \code{\#l=} line followed by the rows $W^{(l)}_{j,0:n_{l-1}}$\\
+\code{checkpoint\_ep<7 digits>.dat} & the weights every \code{Checkpoint\_cyc}; same format, line 1 its own epoch. Copied over \code{nn\_weight.dat} it becomes a restart point\\
+\code{gd\_dw.dat}, \code{gd\_m.dat}, \code{gd\_v.dat}, \code{gd\_r.dat}, \code{gd\_u.dat} & the optimizer state (previous step and the moments); how many exist depends on the method\\
+\bottomrule
+\end{longtable}
+
+\code{Restart 1} reads the weights from \code{nn\_weight.dat}. If
+\code{gd\_dw.dat} is present in the same directory, \textbf{the
+optimizer state is restored too}, so Adam resumes without losing its
+moments; absent, only the optimizer starts cold. If the epoch of the
+weight file and the optimizer log disagree (an old checkpoint copied
+in with the optimizer log left behind), the run stops.
+
+\subsection{Reference information}
+
+\begin{longtable}{@{}p{0.36\textwidth}p{0.58\textwidth}@{}}
+\toprule
+File & Content \\
+\midrule
+\endhead
+\code{hod\_alpha\_order.dat} & the carried multi-index order: slot, $|\mi\alpha|$, $\mi\alpha(1{:}D_0)$ per line. Defines the column order of high-order data files and the slots of the residual echo\\
+\code{data\_division.log} & the indices of the points held out for validation\\
+\code{hod\_golden.dat} & known values for the self-check; absent, the regression comparison is skipped\\
+\bottomrule
+\end{longtable}
+
+\section{Verification specification}
+\label{sec:verify}
+
+With a single propagation engine, correctness is checked
+\textbf{against the definition}: finite-difference verification of
+the weight gradient at three levels.
+
+\begin{longtable}{@{}p{0.34\textwidth}p{0.28\textwidth}p{0.30\textwidth}@{}}
+\toprule
+Level & Object & Measured (max.\ rel.\ error) \\
+\midrule
+\endhead
+\code{tools/dbg\_backward\_fd.f90} (point) & a synthetic dense net ($D_0=2$, $K=3$), arbitrary seed & $2.2\times10^{-10}$ \\
+same (batch vs.\ pointwise) & one batch along two paths & $0$ (loop build)\\
+same (batch vs.\ FD) & central differences of the batch loss & $1.4\times10^{-11}$ \\
+\code{train\_example} test 1 & trained weights, arbitrary seed & $2.9\times10^{-11}$ \\
+\code{Hod\_check 1} & in-run, real data and loss & $3.4\times10^{-10}$ \\
+\bottomrule
+\end{longtable}
+
+Finite differences bound the derivative error but are blind in
+principle to defects that leave the converged value intact --- a
+write one element past an array, a read of a never-set variable, a
+division that is only sometimes by zero. That layer is covered by two
+means:
+
+\begin{itemize}[leftmargin=1.4em]
+\item \code{make harden}: a build with bounds checking, uninitialized
+      values poisoned by a signalling NaN, and IEEE traps (invalid /
+      zero / overflow). The shipped cases run under it with zero
+      violations.
+\item \code{make negtests}: the input-rejection contract and exact
+      properties. Malformed or incomplete inputs must stop with a
+      diagnostic, and properties that hold exactly must do so (a
+      committee of identical members returns exactly zero spread,
+      among others).
+\end{itemize}
+
+The checks run under both the loop build and the \code{BLAS=1}
+build, which compile different kernels (explicit loops against
+matrix products). The two compute the same quantities in different
+summation orders: the gradients agree to rounding, and four of the
+five benchmarks have bit-identical histories, but a long run can
+fork once a last-digit difference appears (\code{kdv} is
+bit-identical for 60 validation cycles, then forks to a final cost
+of the same size). Numbers quoted from runs therefore state which
+build produced them. Finite differences are judged relative to the
+gradient norm: central differences cannot resolve components orders
+of magnitude below the largest, so per-component ratios would
+measure the reference's noise rather than the adjoint's error.
+
+The self-check's pass criterion is \textbf{relative to the size of
+the gradient itself}. Dividing by $\max(|fd|,1)$ becomes an absolute
+tolerance once the gradient drops below one --- on a loss of order
+$10^{-3}$ it would test only three digits. And the known-value check
+fails on zero comparisons: a \code{hod\_golden.dat} generated with a
+different $D_0$, $K$ or closure would have every row skipped as out
+of range and could otherwise pass with nothing compared.
+
+The self-check \code{Hod\_check 1} sets deterministic weights and
+verifies (a) the carried derivatives against central differences in
+$x$ (orders 1--2 only; at $K>2$ the higher slots are covered through
+the seed path by (b) and by \code{fdcheck}), (b) the weight gradient
+against central differences of the loss, (c) regression agreement
+with the known values (\code{hod\_golden.dat}); any miss prints
+\code{FAILED}. What is checked is the exact path that ships.
+
+As a regression net, the training-history columns of five benchmarks
+(\code{kdv}, \code{zk7}, \code{g7}, \code{opt\_ngd},
+\code{opt\_kalman}) are held as frozen references. Thread against
+serial accumulation ($3.2\times10^{-15}$), the concurrent training of
+several networks, and the agreement of Kalman training with the
+ridge-regression solution ($5\times10^{-13}$) are checked by
+\code{train\_example} and \code{libverify\_example}.
+
+%=====================================================================
+\section{Application to force fields}
+
+\code{tools/example\_hod\_ff.f90} demonstrates a force field trained
+on energies, forces and \textbf{analytic Hessians}. Descriptor
+pipelines (n2p2 and kin) provide $dG/dR$ but not $d^2G/dR^2$, so they
+can train up to forces but not Hessians; this gap is the use that
+states the library's position most clearly.
+
+The model is a sum of atomic energies $E=\sum_i N(G^{(i)})$, carrying
+the dense set at $D_0=3$, $K=2$ ($N_\alpha=10$). The model Hessian is
+assembled by the chain rule,
+\[
+H_{pq}=\sum_i\Big[\sum_{ab} \frac{\partial^2 N}{\partial G_a\partial G_b}
+\frac{\partial G_a^{(i)}}{\partial x_p}\frac{\partial G_b^{(i)}}{\partial x_q}
++\sum_a \frac{\partial N}{\partial G_a}
+\frac{\partial^2 G_a^{(i)}}{\partial x_p\partial x_q}\Big],
+\]
+where $\partial^2N/\partial G_a\partial G_b$ of the first term is the
+carried slot $\mi\alpha=\mi e_a+\mi e_b$ and
+$\partial N/\partial G_a$ of the second is $\mi\alpha=\mi e_a$. The
+loss seeds land on the same slots, so \textbf{Hessian training costs
+one ordinary adjoint per atom and configuration}.
+
+\subsection{Verification}
+
+The demonstration contains three hand-written derivative assemblies
+(the descriptor derivatives, the model Hessian, the seed of the
+Hessian loss). Any of them would train a \emph{plausible} force field
+with one wrong coefficient, so each is checked by central differences
+before any physics is reported. Measured (relative):
+
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\toprule
+Check & Max.\ relative difference \\
+\midrule
+$dG/dx$, $d^2G/dx^2$ vs.\ differences of $G$ & $4.7\times10^{-10}$ \\
+model Hessian vs.\ differences of the model energy & $4.4\times10^{-7}$ \\
+$dL/dw$ with the Hessian term vs.\ differences of $L$ & $6.1\times10^{-8}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{The smoothness requirement (important)}
+
+Because second derivatives are propagated, \textbf{the cutoff
+function must be $C^2$ as well}. The cosine cutoff
+$f_c=(\cos(\pi r/r_c)+1)/2$ used by the demonstration has
+$f_c(r_c)=f_c'(r_c)=0$ but
+$f_c''(r_c)=+\tfrac12(\pi/r_c)^2\neq0$: the second derivative jumps
+at $r_c$, so a Hessian-trained model is only $C^1$ across the
+cutoff.
+
+The demonstration works because no pair of the sampled
+configurations approaches $r_c$ --- a property of the sample, not of
+the method. The program therefore \textbf{checks that margin rather
+than assuming it} (measured 0.24 in equilibrium-spacing units). A
+production coupling should use a $C^2$ cutoff (a polynomial, or
+$\tanh^3$).
+
+This is the same general rule stated for the activations: \textbf{the
+smoothness class of every ingredient must exceed the order of the
+derivatives one intends to use}.
+
+\subsection{Result}
+
+Two networks are trained from the same initial weights on the same 60
+configurations under the same schedule:
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Training data & Max.\ rel.\ error, force constants & Max.\ rel.\ error, phonons \\
+\midrule
+$E$, $F$ (a descriptor pipeline's reach) & 1.85\% & 3.84\% \\
+$E$, $F$, $H$ (this library) & 0.55\% & 1.12\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The figure is drawn from the run logs by
+\code{bench/post/make\_fig\_forcefield.py}.
+
+\section{Shipped examples and test cases}
+
+\begin{longtable}{@{}p{0.26\textwidth}p{0.68\textwidth}@{}}
+\toprule
+Where & Content \\
+\midrule
+\endhead
+\code{bench/} & the numerical experiments of the methods paper: KdV, Kawahara, Zakharov--Kuznetsov (orders 3/5/7), Gross--Pitaevskii, the slit, the 10-dimensional EYU case, closure/dense scaling, optimizer comparison, speed comparison\\
+\code{zwork/} & the keyword tour: a value fit (\code{x2+1}), high-order fits (\code{hod\_4d\_k3}, \code{hod\_4d\_k7}), collocation (\code{pinn\_kdv}, \code{pinn\_zk7}), coupled flow systems and \code{System} cases (\code{pinn\_lax}, \code{pinn\_kovasznay}, \code{pinn\_cavity}, \code{pinn\_ehd}), a derivative fit (\code{tour\_derivfit}), a Sobolev loss (\code{tour\_sobolev}), learning-rate schedules (\code{tour\_schedule})\\
+\code{tools/} & worked examples: embedding (\code{example\_embed}), force fields (\code{example\_mlff}), the training API (\code{example\_train}), verification (\code{example\_libverify}), committees (\code{example\_uq}), custom losses (\code{example\_customloss}), the C examples\\
+\code{host/} & use from a host code\\
+\bottomrule
+\end{longtable}
+
+%=====================================================================
+\section{Cost and memory}
+
+With $N_\alpha$ multi-indices and width $n$, one point's forward pass
+costs $O(L\,n^2 N_\alpha)$ in the linear part and
+$O(L\,n\,(\text{table entries}))$ in the Bell part; the reverse pass
+is of the same order. The work space is $O(L\,n\,N_\alpha)$ (the
+adjoint plane covers one layer only). $N_\alpha$ is
+$\binom{D_0+K}{K}$ for the dense set and falls to the necessary
+minimum under a closure.
+
+A value-fit-only run takes the batch path (\code{net\_grad\_batch}),
+where the whole minibatch becomes three matrix products per layer
+(under \code{USE\_BLAS}).
+
+%=====================================================================
+\section{Known limitations}
+\label{sec:limits}
+
+\begin{itemize}[leftmargin=1.4em]
+\item The hidden activation is $\tanh$ (plus the tabulated
+      alternatives of Section~\ref{sec:activation}); carrying another
+      activation needs a generator for its derivative table.
+\item The read-out is linear only. The scalar forms
+      (\code{Residual}, \code{HOD\_DATA}) have one output; the
+      \code{System} block (Section~\ref{sec:system}) sets the output
+      width to the number of field components and carries the seed as
+      a (component $\times$ multi-index) matrix (verified by
+      \code{tools/example\_multiout*.f90}).
+\item No residual connections, convolutions or attention (fully
+      connected only).
+\item The primal natural gradient builds a dense metric and is for
+      small networks (with a stop on quadratic memory); the dual
+      route (\code{Ngd\_dual}) removes that limit for minibatch row
+      counts.
+\item \code{checkpoint\_ep*.dat} holds weights only; the optimizer
+      state lives in \code{gd\_*.dat}. Restarting from an old
+      checkpoint therefore requires the matching optimizer log (a
+      mismatch is detected and stops the run).
+\item The scalar residual's nonlinearity is limited to
+      $u\,T^{\mi\alpha}$. The \code{System} block writes products of
+      up to three derivative factors (\code{XUX}, \code{DXD},
+      \code{TRP}), so $\nabla\rho\!\cdot\!\nabla\phi$ and
+      $\rho u u_x$ are expressible; transcendental functions of the
+      field, $\sin u$ or $e^u$, are expressible in neither form.
+\item Residual coefficients are constants. Space-dependent
+      coefficients $c(\mi{x})$ (inhomogeneous media, potential
+      terms) are not expressible; since \code{SRC} already reads a
+      per-point value, they would extend that mechanism.
+\item There is no bare-Laplacian keyword: $\nabla^2u$ is written as
+      one \code{LIN} line per dimension (\code{DXLAP} is
+      $\partial_x\nabla^{2k}u$ specifically).
+\item C wrappers for the committee and the Kalman filter are not
+      provided.
+\end{itemize}
+
+\end{document}

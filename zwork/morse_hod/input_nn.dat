@@ -1,0 +1,77 @@
+### Proof of concept for a force field: can a network reproduce the
+### third and fourth derivatives of a Morse chain?
+###
+### The anharmonic phonon quantities are exactly these derivatives.  The
+### harmonic force constants are the second, the cubic anharmonicity that
+### sets three-phonon scattering and the thermal conductivity is the
+### third, and the quartic terms that shift frequencies with temperature
+### are the fourth.  A force field validated on energies and forces alone
+### says nothing about them.
+###
+### No descriptors here.  The six atomic positions are the network input,
+### so the carried multi-index slots ARE the force constants and no chain
+### rule stands between the engine and the quantity of interest.  That
+### costs transferability and permutation symmetry, which a real force
+### field needs, and buys a measurement with no hand-written derivative
+### assembly to get wrong.
+###
+### The targets come from the closed form of the Morse derivatives,
+###   V^(n)(r) = 2 D a^n (-1)^n e (2^(n-1) e - 1),   e = exp(-a(r-r0)),
+### which was checked against numerical differentiation to 1e-29.  In one
+### dimension dr/dx = +-1 and every higher derivative of r vanishes, so
+###   d^alpha E = sum_pairs V^(|alpha|)(r) s^|alpha| (-1)^(alpha_j)
+### over the pairs that carry the whole multi-index.
+###
+### The energy itself is not taught.  Once every derivative order is
+### constrained the energy is already determined up to an additive
+### constant, and that constant is exactly the gauge freedom the physics
+### does not fix: a force field is used through its derivatives.  Giving
+### lambda_0 a weight would spend capacity fixing it.
+###
+### Each remaining order is weighted by the inverse square of its scale,
+### lambda_p = 1/||y_p||^2, measured from this data:
+###
+###   order        0        1        2        3        4
+###   RMS       2.52     0.787     4.93     10.9     39.4
+###
+### Equal weights do not work here and the reason is worth recording.
+### The quartic targets are fifty times the size of the forces, so an
+### equally weighted loss is dominated by them: a run made that way
+### reaches a relative error of 0.07 at fourth order while the forces sit
+### at 3.7 and the harmonic constants at 1.4, both above one, meaning
+### those orders carry no information at all.  The apparent success at
+### high order was only the low orders being ignored.  The Taylor weights
+### used elsewhere, lambda_p = 1/(p!)^2, fail the same way in the other
+### direction, leaving the fourth order at 1/576 of the first.
+Init_w       Glorot_norm
+Rand_seed    20260805 /
+Restart      0 /
+Output_deriv 1 /   the carried slots are the quantity of interest here
+
+Nlayer       4 / L
+6 / ndim(1) = the six atomic positions
+24 /
+24 /
+1 / ndim(L)
+
+Loss_term  HOD_DATA  240  train.dat  1.d0 /
+
+Hod_K      4 /
+0.d0            / lambda_0, the energy: not taught, see below
+1.61487370d+00  / lambda_1, the forces
+4.11338510d-02  / lambda_2, the harmonic force constants
+8.40295160d-03  / lambda_3, the cubic anharmonicity
+6.44904720d-04  / lambda_4, the quartic anharmonicity
+Hod_dense  1 /
+
+Hod_check  1 /
+Num_validation 40 /
+Validation_cyc 500 /
+P_max          2000 /
+Epoch      3000 /
+Activation TANH /
+Conv       1.d-14 /
+Num_batch  20 /
+Checkpoint_cyc 100000 /
+GD_method  Adam
+GD_param   0.002d0 0.9d0 0.999d0 1.d-8 0.d0 /

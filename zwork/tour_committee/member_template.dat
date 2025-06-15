@@ -1,0 +1,19 @@
+### One committee member.  train_members.sh runs this four times with a
+### different Rand_seed and keeps each nn_weight.dat as member_<seed>.dat.
+Init_w       Glorot_norm
+Rand_seed    101 /
+Nlayer       4 / L
+1 / ndim(1)
+12 /
+12 /
+1 / ndim(L)
+Loss_term  DATA  200  train.dat  1.d0 /
+Num_validation 20 /
+Validation_cyc 2000 /
+P_max          500 /
+Epoch      20000 /
+Activation TANH /
+Conv       1.d-12 /
+Num_batch  20 /
+GD_method  Adam
+GD_param   0.01d0 0.9d0 0.999d0 1.d-8 0.d0 /

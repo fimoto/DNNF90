@@ -1,0 +1,39 @@
+### PINN benchmark [eyu10d] 10-dim Laplace, E & Yu (2018) Eq.(15); u* = sum x(2k-1)x(2k)
+Rand_seed    20260728 / fixed seed (reproducibility)
+Output_deriv 1 /
+Init_w       LeCun_unif
+Restart      0 /
+Nlayer       4 / L
+10 /
+20 /
+20 /
+1 /
+###
+Loss_term  DATA        2000  data.dat           1.d0 /
+Loss_term  COLLOCATION    6000  colloc.dat         0.5d0 /
+###
+Residual 10 /
+LIN   1.d0        2 0 0 0 0 0 0 0 0 0 /  u_x1x1
+LIN   1.d0        0 2 0 0 0 0 0 0 0 0 /  u_x2x2
+LIN   1.d0        0 0 2 0 0 0 0 0 0 0 /  u_x3x3
+LIN   1.d0        0 0 0 2 0 0 0 0 0 0 /  u_x4x4
+LIN   1.d0        0 0 0 0 2 0 0 0 0 0 /  u_x5x5
+LIN   1.d0        0 0 0 0 0 2 0 0 0 0 /  u_x6x6
+LIN   1.d0        0 0 0 0 0 0 2 0 0 0 /  u_x7x7
+LIN   1.d0        0 0 0 0 0 0 0 2 0 0 /  u_x8x8
+LIN   1.d0        0 0 0 0 0 0 0 0 2 0 /  u_x9x9
+LIN   1.d0        0 0 0 0 0 0 0 0 0 2 /  u_x10x10
+Exact_solution 1 /
+Hod_check 1 /
+###
+Num_validation 50 /
+Validation_cyc 1000 /
+P_max          1000000 /
+###
+Epoch      55000 /
+Activation TANH /
+Conv       1.d-14 /
+Num_batch  100 /
+Checkpoint_cyc         100000 /
+GD_method  Adam
+GD_param   0.003d0 0.9d0 0.999d0 1.d-8 0.d0 /

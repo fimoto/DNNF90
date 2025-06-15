@@ -1,0 +1,35 @@
+# What the paper shows, what produces it, and what the number should be.
+# verify_results.py reads this file; tools/repro_check.py checks that the
+# inputs exist.  A blank tolerance means the row is not compared
+# numerically (a figure, or a value this distribution does not record).
+#
+# artifact,command,source_file,metric,expected,tolerance
+#   metric best_cost reads the 'best epoch=' line of the case's a.log;
+#   every reported figure is taken at the best epoch, which is the state
+#   the run saves and the one the solution error is measured from
+Table tab:bench KdV,bench/run_all.sh,bench/kdv/a.log,best_cost,3.2e-09,0.15
+Table tab:bench Kawahara,bench/run_all.sh,bench/kawahara/a.log,best_cost,7.1e-08,0.15
+Table tab:bench 7th-order,bench/run_all.sh,bench/g7/a.log,best_cost,4.1e-09,0.15
+Table tab:bench ZK3,bench/run_all.sh,bench/zk3/a.log,best_cost,1.8e-08,0.15
+Table tab:bench ZK5,bench/run_all.sh,bench/zk5/a.log,best_cost,7.1e-08,0.15
+Table tab:bench ZK7,bench/run_all.sh,bench/zk7/a.log,best_cost,1.9e-08,0.15
+Fig fig_optimizers SGD,bench/run_all.sh,bench/opt_simple/a.log,best_cost,1.17e-04,0.15
+Fig fig_optimizers Adam,bench/run_all.sh,bench/kdv/a.log,best_cost,3.43e-09,0.15
+Fig fig_optimizers NGD,bench/run_all.sh,bench/opt_ngd/a.log,best_cost,5.40e-10,0.15
+Fig fig_optimizers Kalman,bench/run_all.sh,bench/opt_kalman/a.log,best_cost,5.81e-15,0.30
+Fig fig_ehd NGD,zwork/pinn_ehd/job.sh,zwork/pinn_ehd/ngd_reference/history_ep0000000.dat,final_cost,1.1e-06,0.20
+Fig fig_ehd LBFGS,zwork/pinn_ehd/job.sh,zwork/pinn_ehd/a.log,best_cost,1.17e-05,0.15
+Fig fig_lax7,zwork/pinn_lax7/job.sh,zwork/pinn_lax7/a.log,best_cost,3.27e-10,0.20
+Fig fig_kovasznay,zwork/pinn_kovasznay/job.sh,zwork/pinn_kovasznay/a.log,best_cost,5.62e-05,0.15
+Fig fig_closure closure,bench/run_all.sh,bench/scal_closure/a.log,best_cost,,
+Fig fig_closure dense,bench/run_all.sh,bench/scal_dense/a.log,best_cost,,
+Fig fig_eyu,bench/run_all.sh,bench/eyu10d/a.log,best_cost,,
+Fig fig_solitons,bench/post/make_figs.py,bench/kdv/nn_weight.dat,exists,,
+Fig fig_histories,bench/post/make_figs.py,bench/figs/fig_convergence.pdf,exists,,
+Fig fig_ehd_fields,bench/post/make_fig_ehd_fields.py,zwork/pinn_ehd/output_set0002.dat,exists,,
+Table tab:third,zwork/act_seed_study/job.sh,zwork/act_seed_study/per_seed.csv,exists,,
+Table tab:linear7,zwork/pinn_cosh7/run_seed_study.sh,zwork/pinn_cosh7/per_seed.csv,exists,,
+Table tab:seventh,zwork/hod_4d_k7_order7/run_seed_study.sh,zwork/hod_4d_k7_order7/per_seed.csv,exists,,
+Table tab:sigma,tools/sigma_growth.py,tools/sigma_growth.py,exists,,
+Table tab:speed,bench/post/compare_frameworks.py,bench/cpp/README.md,exists,,
+Table tab:throughput,bench/speed_compare/job.sh,bench/speed_compare/README.txt,exists,,

@@ -1,0 +1,96 @@
+### init_hod_tables
+###   D0=4  K=7
+###   NUM_alpha (multi-indices carried) = 89
+###   Bell table terms                  = 1812
+###   restricted to closure of 21 seed indices
+### Residual as parsed (imposed as R = 0 at every collocation point)
+###   axes are written x1..x4, with axis 4 shown as t (Time_axis)
+###   term      coefficient  expression                    slot  multi-index
+###    1      1.000000E+00  u_t                               5    0  0  0  1
+###    2      7.577955E+00  u * u_x1                          2    1  0  0  0
+###    3      4.576335E+00  u_x1x1x1                         12    3  0  0  0
+###    4      4.576335E+00  u_x1x2x2                         15    1  2  0  0
+###    5      4.576335E+00  u_x1x3x3                         17    1  0  2  0
+###    6     -2.428988E+00  u_x1x1x1x1x1                     37    5  0  0  0
+###    7     -4.857976E+00  u_x1x1x1x2x2                     40    3  2  0  0
+###    8     -4.857976E+00  u_x1x1x1x3x3                     42    3  0  2  0
+###    9     -2.428988E+00  u_x1x2x2x2x2                     47    1  4  0  0
+###   10     -4.857976E+00  u_x1x2x2x3x3                     49    1  2  2  0
+###   11     -2.428988E+00  u_x1x3x3x3x3                     51    1  0  4  0
+###   12      3.965695E-01  u_x1x1x1x1x1x1x1                 80    7  0  0  0
+###   13      1.189708E+00  u_x1x1x1x1x1x2x2                 81    5  2  0  0
+###   14      1.189708E+00  u_x1x1x1x1x1x3x3                 82    5  0  2  0
+###   15      1.189708E+00  u_x1x1x1x2x2x2x2                 83    3  4  0  0
+###   16      2.379417E+00  u_x1x1x1x2x2x3x3                 84    3  2  2  0
+###   17      1.189708E+00  u_x1x1x1x3x3x3x3                 85    3  0  4  0
+###   18      3.965695E-01  u_x1x2x2x2x2x2x2                 86    1  6  0  0
+###   19      1.189708E+00  u_x1x2x2x2x2x3x3                 87    1  4  2  0
+###   20      1.189708E+00  u_x1x2x2x3x3x3x3                 88    1  2  4  0
+###   21      3.965695E-01  u_x1x3x3x3x3x3x3                 89    1  0  6  0
+###
+### PINN residual training enabled
+Residual terms (after DXLAP expansion)  21
+Exact_solution  1
+Time_axis  4
+### High-order derivative (HOD) training enabled
+Hod_K  7
+Hod_lambda(0:K)    0.100E+01  0.100E+01  0.100E+01  0.100E+01  0.100E+01  0.100E+01  0.100E+01  0.100E+01
+Hod_alpha_file  NONE
+Hod_check  0
+Task  TRAIN
+Average_cyc_mpi  1
+Shuffle  0
+Shuffle_cyc_mpi  1000000
+Output_deriv  1
+Restart  0
+
+********************
+Network Construction
+Nlayer  4
+           4
+           8
+           8
+           1
+********************
+Number of weight parameters  121
+
+All input  330
+Training  300
+Validation  30
+********************
+Label_start & Label_end
+           1         180
+         181         330
+Ndata_train_set(i) & label_end(i)-label_start(i)+1
+         180         180
+         150         150
+********************
+Early Stopping
+NUM_validation  30
+val_cyc  1000000
+p_max: maximum patience for early stopping  1000000
+********************
+Epoch  500
+Conv    0.10E-13
+********************
+Regularization
+********************
+
+Activation  TANH           
+
+Sample number in a minibatch (Mbatch)  10
+
+Output Cycle (OC)  100000
+Initialization  LECUN_UNIF     
+GD_method  ADAM                          
+GD_param     0.0010000000   0.9000000000   0.9990000000   0.0000000100   0.0000000000   0.0000000000
+GD_ratio
+   1.0000000000
+   0.0000010000
+
+start from total epoch: istart_step=  0
+ best epoch=           1  0.29000348913235430     
+ writing output_set*.dat for 330 points
+               0.638[s]
+     0.011[min]
+     0.000[h]

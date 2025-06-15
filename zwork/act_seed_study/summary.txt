@@ -1,0 +1,27 @@
+  paired activation study, 10 complete seeds
+  seed           TANH        SIN     BESSEL    BESSEL1   (R2 worst slot)
+  11111        0.4456     0.7304     0.8544     0.7732
+  12345        0.4393     0.7791     0.9026     0.7598
+  22222        0.4764     0.8215     0.9110     0.8577
+  33333       -0.1013     0.8173     0.5385     0.9674
+  44444       -0.7608     0.6858     0.9135     0.7782
+  55555       -0.0655     0.6016     0.7282     0.5274
+  66666        0.2397     0.7433     0.8911     0.8858
+  77777        0.0071     0.5705     0.8271     0.8918
+  88888       -0.4117     0.5727     0.7574     0.6571
+  99999        0.3688     0.5840     0.8596     0.9417
+
+  act          R2 mean   R2 worst   R2 worst         cost
+                median     median        min       median
+  per-seed values written to per_seed.csv
+  TANH          0.8622     0.1234    -0.7608    6.076e-03
+  SIN           0.9499     0.7081     0.5705    1.389e-03
+  BESSEL        0.9874     0.8570     0.5385    3.619e-04
+  BESSEL1       0.9736     0.8180     0.5274    9.991e-04
+
+  SIN beats TANH on cost 10/10, sign test p = 0.0010
+     worst-slot ranges: TANH [-0.7608, 0.4764]  SIN [0.5705, 0.8215]  disjoint True
+  BESSEL beats TANH on cost 10/10, sign test p = 0.0010
+     worst-slot ranges: TANH [-0.7608, 0.4764]  BESSEL [0.5385, 0.9135]  disjoint True
+  BESSEL1 beats TANH on cost 10/10, sign test p = 0.0010
+     worst-slot ranges: TANH [-0.7608, 0.4764]  BESSEL1 [0.5274, 0.9674]  disjoint True

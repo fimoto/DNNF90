@@ -1,0 +1,38 @@
+### High-order derivative training on a seed closure, not the dense set:
+### the carried multi-indices are the downward closure of alpha_seeds.dat.
+### target u(x) = prod_i sin(omega_i x_i + phi_i), see tools/gen_hod_train.f90
+Rand_seed    20260803 / fixed seed (reproducibility)
+Restart     0 /
+Output_deriv 1 / write output_hod.datXXXX at the end
+Init_w      LeCun_unif
+Nlayer      4 / L
+4 / ndim(1) = D0
+6 /
+6 /
+1 / ndim(L) (must be 1 for MATH_HOD)
+###
+Loss_term  HOD_DATA      80  train.dat          1.d0 /
+###
+Hod_K 7 / max order K; lambda_p = 1/(p!)^2 (Taylor-coefficient normalization)
+1.000000e+00  / lambda_0 = 1/(p!)^2
+1.000000e+00  / lambda_1 = 1/(p!)^2
+2.500000e-01  / lambda_2 = 1/(p!)^2
+2.777778e-02  / lambda_3 = 1/(p!)^2
+1.736111e-03  / lambda_4 = 1/(p!)^2
+6.944444e-05  / lambda_5 = 1/(p!)^2
+1.929012e-06  / lambda_6 = 1/(p!)^2
+3.936760e-08  / lambda_7 = 1/(p!)^2
+Hod_check 1 / run self-tests [G][F][W] before fitting
+Hod_alpha_file alpha_seeds.dat /
+###
+Num_validation 10 /
+Validation_cyc 50 /
+P_max 10000 /
+###
+Epoch      10000 /
+Activation TANH / required for MATH_HOD
+Conv       1.d-8 /
+Num_batch  10 /
+Checkpoint_cyc         1000 /
+GD_method  Adam
+GD_param   0.002d0 0.9d0 0.999d0 1.d-8 0.d0 /

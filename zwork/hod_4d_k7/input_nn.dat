@@ -1,0 +1,36 @@
+### High-order derivative corner case: D0=4, K=7 (330 targets/point, dense)
+### self-check [G][F][W] plus a short training run
+Output_deriv 1 /
+Init_w       LeCun_unif
+Rand_seed    20260802 / fixed seed (reproducibility)
+Restart      0 /
+Nlayer       4 / L
+4 / ndim(1)
+6 /
+6 /
+1 / ndim(L)
+###
+Loss_term  HOD_DATA      60  train.dat          1.d0 /
+###
+Hod_K 7 / K; lambda_p = 1/(p!)^2 (Taylor-coefficient normalization)
+1.000000e+00  / lambda_0 = 1/(p!)^2
+1.000000e+00  / lambda_1 = 1/(p!)^2
+2.500000e-01  / lambda_2 = 1/(p!)^2
+2.777778e-02  / lambda_3 = 1/(p!)^2
+1.736111e-03  / lambda_4 = 1/(p!)^2
+6.944444e-05  / lambda_5 = 1/(p!)^2
+1.929012e-06  / lambda_6 = 1/(p!)^2
+3.936760e-08  / lambda_7 = 1/(p!)^2
+Hod_check 1 /
+###
+Num_validation 10 /
+Validation_cyc 100 /
+P_max          10000 /
+###
+Epoch      10000 /
+Activation TANH /
+Conv       1.d-10 /
+Num_batch  10 /
+Checkpoint_cyc         100 /
+GD_method  Adam
+GD_param   0.002d0 0.9d0 0.999d0 1.d-8 0.d0 /

@@ -1,0 +1,49 @@
+### PINN demo trained by the extended Kalman filter instead of a
+### gradient method.  Same problem, same data and same network as
+### zwork/pinn_poisson2d, so the two directories are a direct comparison:
+###
+###   Adam    20000 epochs -> cost 1.1e-2, rms error 3.1e-3 against u*
+###   Kalman    300 epochs -> cost 4.8e-9, rms error 1.8e-5 against u*
+###
+### The filter presents one scalar observable at a time.  Here the
+### observable of a collocation point is the residual and its target is
+### zero, and the Jacobian row dR/dw comes from the same seed the
+### gradient path uses.  The covariance is n_w x n_w, so this method
+### belongs to small networks; the run reports its size on startup.
+###
+### GD_param for KALMAN:
+###   p1 = initial diagonal of the covariance P
+###   p2 = initial forgetting factor lambda
+###   p3 = lambda0 of the schedule lambda <- lambda0*lambda + 1 - lambda0
+Output_deriv 1 /
+Init_w       Glorot_norm
+Rand_seed    20260730 / fixed seed (reproducibility)
+Restart      0 /
+Nlayer       4 / L
+2 / ndim(1): (x,y)
+20 /
+20 /
+1 / ndim(L)
+Loss_term  DATA         160  data.dat     1.d0  / boundary condition
+Loss_term  COLLOCATION  400  colloc.dat   1.d-3 / interior residual
+Residual 3 /
+LIN   1.d0    2 0 /  u_xx
+LIN   1.d0    0 2 /  u_yy
+SRC  -1.d0        /  minus the source column of colloc.dat
+Exact_solution 1 /
+Hod_check 1 /
+Num_validation 30 /
+Validation_cyc 20 /
+P_max          500 /
+Epoch      300 /
+Activation TANH /
+Conv       1.d-12 /
+Num_batch  40 /
+Checkpoint_cyc 100 /
+Hod_K      2 /
+1.d0
+0.d0
+0.d0
+Hod_dense  1 /
+GD_method  KALMAN
+GD_param   1.d-2 0.98d0 0.9995d0 0.d0 0.d0 /

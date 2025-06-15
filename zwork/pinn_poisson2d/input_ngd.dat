@@ -1,0 +1,44 @@
+### Section 5.4: the natural gradient on the two-dimensional Poisson case.
+###
+### PINN demo: two-dimensional Poisson with a source term.
+###   u_xx + u_yy = f(x,y),   f = -2 pi^2 sin(pi x) sin(pi y)
+### on the unit square, with u = 0 on the boundary.  The exact solution
+### is u = sin(pi x) sin(pi y).
+###
+### The residual is written as  u_xx + u_yy - f = 0, so the SRC term
+### carries the coefficient -1.  A SRC term makes the collocation file
+### hold one extra column, the value of f at that point, placed right
+### after the coordinates.  The last column here is the exact solution,
+### which Exact_solution 1 reports on but never trains against.
+Output_deriv 1 /
+Init_w       Glorot_norm
+Rand_seed    20260730 / fixed seed (reproducibility)
+Restart      0 /
+Nlayer       4 / L
+2 / ndim(1): (x,y)
+20 /
+20 /
+1 / ndim(L)
+Loss_term  DATA         160  data.dat     1.d0  / boundary condition
+Loss_term  COLLOCATION  400  colloc.dat   1.d-3 / interior residual
+Residual 3 /
+LIN   1.d0    2 0 /  u_xx
+LIN   1.d0    0 2 /  u_yy
+SRC  -1.d0        /  minus the source column of colloc.dat
+Exact_solution 1 /
+Hod_check 1 /
+Num_validation 30 /
+Validation_cyc 200 /
+P_max          500 /
+Epoch      2000 /
+Activation TANH /
+Conv       1.d-12 /
+Num_batch  40 /
+Checkpoint_cyc 5000 /
+Hod_K      2 /
+1.d0
+0.d0
+0.d0
+Hod_dense  1 /
+GD_method  Natural_grad
+GD_param   1.0d0 1.d-5 0.d0 0.d0 0.d0 /

@@ -1,0 +1,61 @@
+Task  TRAIN
+Average_cyc_mpi  1
+Shuffle  0
+Shuffle_cyc_mpi  1000000
+Output_deriv  0
+Restart  0
+
+********************
+Network Construction
+Nlayer  4
+           1
+          10
+          10
+           1
+********************
+Number of weight parameters  141
+
+All input  200
+Training  180
+Validation  20
+********************
+Label_start & Label_end
+           1         200
+Ndata_train_set(i) & label_end(i)-label_start(i)+1
+         200         200
+********************
+Early Stopping
+NUM_validation  20
+val_cyc  10
+p_max: maximum patience for early stopping  15
+********************
+Epoch  5000
+Conv    0.10E-05
+********************
+Regularization
+********************
+
+Activation  TANH           
+
+Sample number in a minibatch (Mbatch)  50
+
+Output Cycle (OC)  1000
+Initialization  HE_NORM        
+GD_method  SIMPLE_SCHEDULE               
+GD_param     0.5000000000   0.0010000000   0.0000000000   0.0000000000   0.0000000000   0.0000000000
+GD_ratio
+   1.0000000000
+
+start from total epoch: istart_step=  0
+### init_hod_tables
+###   D0=1  K=1
+###   NUM_alpha (multi-indices carried) = 1
+###   Bell table terms                  = 0
+###   restricted to closure of 1 seed indices
+ patience exceeded
+ exit epoch#=         820 err=   6.3553640424336474E-003   9.9999999999999995E-007
+ best epoch=         820   6.3553640424336474E-003
+ writing output_set*.dat for 200 points
+               0.297[s]
+     0.005[min]
+     0.000[h]

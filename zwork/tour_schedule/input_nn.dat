@@ -1,0 +1,26 @@
+### Keyword tour: learning-rate schedule and early stopping.
+### eta(t) = 0.5/sqrt(t+1) + 0.001 (SIMPLE_SCHEDULE); 20 points are
+### held out and validated every 10 epochs; patience is CUMULATIVE
+### (total worsened validations), so P_max 15 stops the run early;
+### Conv stops on training cost below 1e-6.
+### Weight_update_type SIMPLE keeps the best-on-training weights.
+Output_deriv 0 /
+Init_w       He_norm
+Rand_seed    20260731 /
+Restart      0 /
+Nlayer       4 / L
+1  /
+10 /
+10 /
+1  /
+Loss_term  DATA         200  train.dat          1.d0 /
+Num_validation 20 /
+Validation_cyc 10 /
+P_max          15 /
+Epoch      5000 /
+Activation TANH /
+Conv       1.d-6 /
+Num_batch  50 /
+Checkpoint_cyc         1000 /
+GD_method  SIMPLE_SCHEDULE
+GD_param   0.5d0 0.001d0 0.d0 0.d0 0.d0 /

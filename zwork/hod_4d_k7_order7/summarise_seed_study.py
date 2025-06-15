@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""Summarise the seventh-order seed study written by seed_study.sh.
+
+Reads every study_<seed>_<activation>/ directory and writes
+per_seed.csv plus the table the paper reports: the median loss over
+seeds, its range, and the relative error of the seventh derivatives,
+||T-y||_7 / ||y||_7, over the 120 multi-indices of order exactly seven
+and all points.  A value of one is the error predicting zero would give.
+
+A run that did not reach the epoch count the case declares is left out
+rather than compared against complete ones, and the count of complete
+seeds is printed so that a truncated study cannot pass for a full one.
+"""
+import glob
+import os
+import re
+import statistics
+import sys
+
+
+def order_of(path):
+    """|alpha| for each carried slot, from hod_alpha_order.dat."""
+    deg = []
+    for line in open(path):
+        f = line.split()
+        if f and f[0].lstrip("-").isdigit():
+            deg.append(int(f[1]))
+    return deg
+
+
+def history(run):
+    """(epochs, costs) from the run's validation history."""
+    path = os.path.join(run, "history_ep0000000.dat")
+    if not os.path.exists(path):
+        return None, None
+    ep, co = [], []
+    for line in open(path):
+        if line.lstrip().startswith("#"):
+            continue
+        f = line.split()
+        if len(f) >= 3:
+            try:
+                ep.append(float(f[0])); co.append(float(f[2]))
+            except ValueError:
+                pass
+    return (ep, co) if co else (None, None)
+
+
+def rel_error(run, deg):
+    """||T - y||_7 / ||y||_7 over the slots of order seven."""
+    path = os.path.join(run, "output_hod_set0001.dat")
+    if not os.path.exists(path):
+        return None
+    na = len(deg)
+    num = den = 0.0
+    for line in open(path):
+        if line.lstrip().startswith("#"):
+            continue
+        v = [float(t) for t in line.split()]
+        if len(v) < 2 * na:
+            continue
+        pred, targ = v[-2 * na:-na], v[-na:]
+        for i, d in enumerate(deg):
+            if d == 7:
+                num += (pred[i] - targ[i]) ** 2
+                den += targ[i] ** 2
+    return (num / den) ** 0.5 if den > 0 else None
+
+
+def main():
+    acts = sys.argv[1:] or ["TANH", "SIN", "BESSEL", "BESSEL1"]
+    runs = sorted(glob.glob("study_*_*"))
+    if not runs:
+        print("no study_* directories; run seed_study.sh first")
+        sys.exit(1)
+    want = None
+    for line in open("input_nn.dat"):
+        if line.strip().startswith("Epoch"):
+            want = float(line.split()[1]); break
+    deg = order_of(os.path.join(runs[0], "hod_alpha_order.dat"))
+    data, short = {}, []
+    for r in runs:
+        m = re.match(r"study_(\d+)_(\w+)$", r)
+        if not m:
+            continue
+        s, a = m.group(1), m.group(2)
+        ep, co = history(r)
+        if co is None:
+            continue
+        if want is not None and ep[-1] < want:
+            short.append(r); continue
+        e = rel_error(r, deg)
+        if e is None:
+            continue
+        data.setdefault(s, {})[a] = (min(co), e)
+    full = [s for s in sorted(data) if all(a in data[s] for a in acts)]
+    if short:
+        print("  %d run(s) stopped short of %d epochs and are excluded: %s"
+              % (len(short), int(want), " ".join(short)))
+    with open("per_seed.csv", "w") as fh:
+        fh.write("seed,activation,loss,rel_error_order7\n")
+        for s in full:
+            for a in acts:
+                fh.write("%s,%s,%.6g,%.6g\n" % (s, a, data[s][a][0], data[s][a][1]))
+    print("  seventh-order seed study, %d complete seeds" % len(full))
+    print("  per-seed values written to per_seed.csv")
+    print("  %-9s %10s %24s %9s %s"
+          % ("act", "loss med", "loss range", "rel err", "beats TANH"))
+    for a in acts:
+        L = [data[s][a][0] for s in full]
+        e = [data[s][a][1] for s in full]
+        wins = sum(1 for s in full if data[s][a][0] < data[s]["TANH"][0])
+        print("  %-9s %10.4g  [%10.4g, %10.4g] %9.3f %6d/%d"
+              % (a, statistics.median(L), min(L), max(L),
+                 statistics.median(e), wins, len(full)))
+
+
+main()

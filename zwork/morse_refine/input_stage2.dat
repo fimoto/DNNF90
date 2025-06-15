@@ -1,0 +1,45 @@
+### Stage two: the same network refined with the high orders added.
+###
+### Restarts from the weights of morse_refine_stage1 and trains four
+### thousand further epochs with the second, third and fourth derivatives
+### taught alongside the forces.  Copy nn_weight.dat across first.
+###
+### The cubic anharmonicity goes from 0.44 to 0.02 and the quartic from
+### 1.2 to 0.04, and the forces improve as well, from 0.03 to 0.02.
+###
+### The control below is what makes that attributable.  Training the same
+### four thousand epochs on the forces alone leaves the cubic error at
+### 0.44 and the quartic at 1.26: unchanged.  The improvement is the
+### high-order information and not the extra epochs.
+Init_w       Glorot_norm
+Rand_seed    20260805 /
+Restart      1 /
+Output_deriv 1 /   the carried slots are the quantity of interest here
+
+Nlayer       4 / L
+6 / ndim(1) = the six atomic positions
+24 /
+24 /
+1 / ndim(L)
+
+Loss_term  HOD_DATA  240  train.dat  1.d0 /
+
+Hod_K      4 /
+0.d0            / lambda_0, the energy: not taught, see below
+1.61487370d+00  / lambda_1, the forces
+4.11338510d-02  / lambda_2, the harmonic force constants
+8.40295160d-03  / lambda_3, the cubic anharmonicity
+6.44904720d-04  / lambda_4, the quartic anharmonicity
+Hod_dense  1 /
+
+Hod_check  1 /
+Num_validation 40 /
+Validation_cyc 500 /
+P_max          2000 /
+Epoch      2000 /
+Activation TANH /
+Conv       1.d-14 /
+Num_batch  20 /
+Checkpoint_cyc 100000 /
+GD_method  Adam
+GD_param   0.002d0 0.9d0 0.999d0 1.d-8 0.d0 /

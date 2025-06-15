@@ -1,0 +1,39 @@
+### The control arm: the same four thousand further epochs, on the
+### forces alone.
+###
+### Without this the refinement of stage two could be attributed to the
+### longer training rather than to the derivatives that were added.  It
+### is not: the cubic and quartic errors are the same at the end of this
+### stage as at the end of stage one.
+Init_w       Glorot_norm
+Rand_seed    20260805 /
+Restart      1 /
+Output_deriv 1 /   the carried slots are the quantity of interest here
+
+Nlayer       4 / L
+6 / ndim(1) = the six atomic positions
+24 /
+24 /
+1 / ndim(L)
+
+Loss_term  HOD_DATA  240  train.dat  1.d0 /
+
+Hod_K      4 /
+0.d0            / lambda_0, the energy: not taught, see below
+1.61487370d+00  / lambda_1, the forces
+0.d0            / lambda_2, not taught in this stage
+0.d0            / lambda_3, not taught in this stage
+0.d0            / lambda_4, not taught in this stage
+Hod_dense  1 /
+
+Hod_check  1 /
+Num_validation 40 /
+Validation_cyc 500 /
+P_max          2000 /
+Epoch      2000 /
+Activation TANH /
+Conv       1.d-14 /
+Num_batch  20 /
+Checkpoint_cyc 100000 /
+GD_method  Adam
+GD_param   0.002d0 0.9d0 0.999d0 1.d-8 0.d0 /

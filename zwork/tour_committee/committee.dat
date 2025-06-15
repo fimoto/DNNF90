@@ -1,0 +1,33 @@
+### Keyword tour: committee (ensemble) uncertainty estimation.
+###
+### Task COMMITTEE evaluates networks that are already trained: it reads
+### the member weight files, writes the mean and the sample standard
+### deviation of every carried slot at every input point, and stops.  No
+### training, no history, no checkpoints.
+###
+### The members are independently trained networks, so one run cannot
+### produce them.  Run ./train_members.sh first: it trains four members
+### that differ only in Rand_seed.
+###
+### With Output_deriv 1 the dense first-order set is carried, so the
+### spread of dN/dx is reported next to the spread of the value.  That is
+### the quantity an on-the-fly scheme thresholds when it decides whether
+### the expensive reference calculation must be called.
+Task COMMITTEE /
+Committee 4 /
+member_101.dat
+member_202.dat
+member_303.dat
+member_404.dat
+Output_deriv 1 /
+Init_w       Glorot_norm
+Nlayer       4 / L
+1 / ndim(1)
+12 /
+12 /
+1 / ndim(L)
+Loss_term  DATA  200  train.dat  1.d0 /
+Epoch      1 /
+Num_batch  20 /
+GD_method  Adam
+GD_param   0.01d0 0.9d0 0.999d0 1.d-8 0.d0 /

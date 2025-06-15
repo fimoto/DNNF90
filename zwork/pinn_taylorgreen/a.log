@@ -1,0 +1,67 @@
+Note: The following floating-point exceptions are signalling: IEEE_UNDERFLOW_FLAG IEEE_DENORMAL
+### init_hod_tables
+###   D0=3  K=2
+###   NUM_alpha (multi-indices carried) = 10
+###   Bell table terms                  = 15
+### High-order derivative (HOD) training enabled
+Hod_K  2
+Hod_lambda(0:K)    0.100E+01  0.000E+00  0.000E+00
+Hod_alpha_file  NONE
+Hod_check  0
+Task  TRAIN
+Average_cyc_mpi  1
+Shuffle  0
+Shuffle_cyc_mpi  1000000
+Output_deriv  0
+Restart  0
+
+********************
+Network Construction
+Nlayer  4
+           3
+          40
+          40
+           3
+********************
+Number of weight parameters  1923
+
+All input  1200
+Training  1140
+Validation  60
+********************
+Label_start & Label_end
+           1         400
+         401        1200
+Ndata_train_set(i) & label_end(i)-label_start(i)+1
+         400         400
+         800         800
+********************
+Early Stopping
+NUM_validation  60
+val_cyc  500
+p_max: maximum patience for early stopping  2000
+********************
+Epoch  20000
+Conv    0.10E-13
+********************
+Regularization
+********************
+
+Activation  TANH           
+
+Sample number in a minibatch (Mbatch)  40
+
+Output Cycle (OC)  100000
+Initialization  GLOROT_NORM    
+GD_method  ADAM                          
+GD_param     0.0020000000   0.9000000000   0.9990000000   0.0000000100   0.0000000000   0.0000000000
+GD_ratio
+   1.0000000000
+   0.0100000000
+
+start from total epoch: istart_step=  0
+ best epoch=       17500   1.4944978978786844E-003
+ writing output_set*.dat for 1200 points
+              45.730[s]
+     0.762[min]
+     0.013[h]

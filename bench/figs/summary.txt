@@ -1,0 +1,13 @@
+kdv: |A|=5 [dW-R]=8.13e-10 cost=3.20e-09 uRMSE=0.0002 time=85.1s best_epoch=59200
+kawahara: |A|=7 [dW-R]=9.68e-10 cost=7.10e-08 uRMSE=0.0024 time=114.3s best_epoch=59400
+g7: |A|=9 [dW-R]=1.41e-09 cost=4.07e-09 uRMSE=0.0059 time=663.9s best_epoch=199600
+zk3: |A|=13 [dW-R]=2.23e-10 cost=1.76e-08 uRMSE=0.0001 time=98.6s best_epoch=30000
+zk5: |A|=39 [dW-R]=3.48e-10 cost=7.08e-08 uRMSE=0.0004 time=231.3s best_epoch=29900
+zk7: |A|=89 [dW-R]=7.15e-10 cost=1.89e-08 uRMSE=0.0006 time=1272.6s best_epoch=60000
+eyu10d: |A|=21 [dW-R]=4.90e-10 relL2=0.0081 (uRMSE=0.0109, u_rms=1.344) time=214.2s
+slit: |A|=5 [dW-R]=1.09e-09 relL2=0.1890 (uRMSE=0.1147, u_rms=0.607) time=13.9s
+scaling: closure 1.28 ms/ep vs dense 7.82 ms/ep -> x6.1
+opt SGD: best cost 1.17e-04 at epoch 60000 of 60000
+opt Adam: best cost 3.20e-09 at epoch 59200 of 60000
+opt NGD: best cost 5.40e-10 at epoch 3000 of 3000
+opt Kalman: best cost 5.81e-15 at epoch 100 of 100

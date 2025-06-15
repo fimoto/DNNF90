@@ -1,0 +1,107 @@
+### init_hod_tables
+###   D0=4  K=7
+###   NUM_alpha (multi-indices carried) = 89
+###   Bell table terms                  = 1812
+###   restricted to closure of 21 seed indices
+### PINN residual training enabled
+Pinn_residual terms (after DXLAP expansion)  21
+  LIN  c=  0.100000E+01  alpha=  0  0  0  1
+  UUX  c=  0.757796E+01  alpha=  1  0  0  0
+  LIN  c=  0.457633E+01  alpha=  3  0  0  0
+  LIN  c=  0.457633E+01  alpha=  1  2  0  0
+  LIN  c=  0.457633E+01  alpha=  1  0  2  0
+  LIN  c= -0.242899E+01  alpha=  5  0  0  0
+  LIN  c= -0.485798E+01  alpha=  3  2  0  0
+  LIN  c= -0.485798E+01  alpha=  3  0  2  0
+  LIN  c= -0.242899E+01  alpha=  1  4  0  0
+  LIN  c= -0.485798E+01  alpha=  1  2  2  0
+  LIN  c= -0.242899E+01  alpha=  1  0  4  0
+  LIN  c=  0.396569E+00  alpha=  7  0  0  0
+  LIN  c=  0.118971E+01  alpha=  5  2  0  0
+  LIN  c=  0.118971E+01  alpha=  5  0  2  0
+  LIN  c=  0.118971E+01  alpha=  3  4  0  0
+  LIN  c=  0.237942E+01  alpha=  3  2  2  0
+  LIN  c=  0.118971E+01  alpha=  3  0  4  0
+  LIN  c=  0.396569E+00  alpha=  1  6  0  0
+  LIN  c=  0.118971E+01  alpha=  1  4  2  0
+  LIN  c=  0.118971E+01  alpha=  1  2  4  0
+  LIN  c=  0.396569E+00  alpha=  1  0  6  0
+Pinn_exact  1
+### High-order derivative (HOD) training enabled
+Hod_k  7
+Hod_lambda(0:K)    0.100E+01  0.100E+01  0.100E+01  0.100E+01  0.100E+01  0.100E+01  0.100E+01  0.100E+01
+Hod_alpha_file  NONE
+Hod_check  1
+Task  TRAIN  
+Average_cyc_mpi  1
+Shuffle  0
+Shuffle_cyc_mpi  1000000
+Calc_deriv  1
+Restart  0
+gd_param(0)     0.00000
+
+
+********************
+Network Construction
+Nlayer  4
+           4
+           8
+           8
+           1
+********************
+Number of weight parameters  121
+
+All input  330
+Training  300
+Validation  30
+********************
+Label_start & Label_end
+           1         180
+         181         330
+Ndata_train_set(i) & label_end(i)-label_start(i)+1
+         180         180
+         150         150
+********************
+Early Stopping
+NUM_validation  30
+val_cyc  100
+p_max: maximum patience for early stopping  100000
+********************
+Epoch  500
+Conv    0.10E-11
+********************
+Regularization
+********************
+
+Activation  TANH           
+tanh
+
+Sample number in a minibatch (Mbatch)  10
+
+Output Cycle (OC)  500
+Initialization  LECUN_UNIF     
+GD_method  ADAM                          
+GD_param     0.0010000000   0.9000000000   0.9990000000   0.0000000100   0.0000000000   0.0000000000
+GD_ratio
+   1.0000000000
+   0.0000010000
+
+#############################################
+### HOD self-check
+### [G] hod_golden.dat not found: skipped
+### [F] input FD check (|alpha|<=2): max |T - FD| =   0.30875E-08
+### [F] passed
+### [W] weight-gradient FD check: 43 weights, max relative error =   0.20539E-09
+### [W] passed
+### [P] PINN residual-gradient FD check: 43 weights, max relative error =   0.45207E-12
+### [P] passed
+### HOD self-check: ALL PASSED
+#############################################
+start from total epoch: istart_step=  0
+ best epoch=         200   46.819572624464733     
+ output.dat,NUM_input=         330
+
+ err=   5.2382951724222228E-002
+               0.884[s]
+     0.015[min]
+     0.000[h]

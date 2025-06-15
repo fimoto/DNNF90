@@ -1,0 +1,33 @@
+### PINN benchmark [zk5] extended ZK 5th: u = sech^4(0.3(xi-4.6656t))
+Rand_seed    20260728 / fixed seed (reproducibility)
+Output_deriv 1 /
+Init_w       LeCun_unif
+Restart      0 /
+Nlayer       4 / L
+4 /
+8 /
+8 /
+1 /
+###
+Loss_term  DATA         180  data.dat           1.d0 /
+Loss_term  COLLOCATION     150  colloc.dat         1.d-3 /
+###
+Residual 4 /
+LIN   1.d0            0 0 0 1 /  u_t
+UUX   13.608d0        1 0 0 0 /
+DXLAP 3.438367346939d0  1 /
+DXLAP -0.539775093711d0 2 /
+Exact_solution 1 /
+Hod_check 1 /
+###
+Num_validation 30 /
+Validation_cyc 100 /
+P_max          1000000 /
+###
+Epoch      30000 /
+Activation TANH /
+Conv       1.d-14 /
+Num_batch  300 /
+Checkpoint_cyc         100000 /
+GD_method  Adam
+GD_param   0.001d0 0.9d0 0.999d0 1.d-8 0.d0 /

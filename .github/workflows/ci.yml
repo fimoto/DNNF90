@@ -1,0 +1,94 @@
+# Short checks that must pass on every push.  The long ones -- the full
+# benchmark suite, the seed studies, the framework comparison -- take
+# hours and are not run here; docs/REPRODUCING.md covers those.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran libopenblas-dev libopenmpi-dev openmpi-bin
+          python3 -m pip install -r requirements-repro.txt
+
+      - name: Default build
+        run: make
+
+      - name: Fortran 2003 conformance
+        run: make f2003check
+
+      - name: Gradient checks
+        run: make fdcheck.out && ./build/fdcheck.out
+
+      - name: Regression and contract tests
+        run: make negtests
+
+      - name: BLAS build and the same tests
+        run: make clean && make BLAS=1 && make BLAS=1 negtests
+
+      - name: MPI, the whole-set methods against the serial run
+        run: |
+          make clean && make && make mpi
+          set -e
+          for case in bench/opt_ngd zwork/pinn_lax7; do
+            rm -rf /tmp/mpichk && mkdir -p /tmp/mpichk/serial /tmp/mpichk/np2
+            for d in serial np2; do
+              cp $case/*.dat /tmp/mpichk/$d/
+              sed -i 's/^Epoch .*/Epoch      10 \//' /tmp/mpichk/$d/input_nn.dat
+            done
+            ( cd /tmp/mpichk/serial && $GITHUB_WORKSPACE/build/serial.out > a.log )
+            ( cd /tmp/mpichk/np2 && mpirun --allow-run-as-root --oversubscribe \
+                -np 2 $GITHUB_WORKSPACE/build/mpi.out > a.log )
+            python3 - <<'PY'
+          import re
+          def best(p):
+              for l in open(p):
+                  if 'best epoch' in l: return float(l.split()[-1].replace('E','e'))
+          a = best('/tmp/mpichk/serial/a.log'); b = best('/tmp/mpichk/np2/a.log')
+          rel = abs(a-b)/abs(a)
+          print('serial %.17e  np2 %.17e  rel %.2e' % (a, b, rel))
+          assert rel < 1e-9, 'the split step does not match the serial one'
+          PY
+          done
+
+      - name: MPI build, two and four ranks, a two-term loss
+        run: |
+          make clean && make mpi
+          cd bench/kdv
+          sed -i 's/^Epoch .*/Epoch      5 \//' input_nn.dat
+          # the shipped case is full batch; under MPI each rank draws its
+          # share of every Loss_term, so the batch must fit in one rank's
+          # share of the smallest term
+          sed -i 's/^Num_batch .*/Num_batch  20 \//' input_nn.dat
+          for np in 2 4; do
+            rm -f gd_*.dat nn_weight.dat history_*.dat
+            mpirun --allow-run-as-root --oversubscribe -np $np ../../build/mpi.out
+          done
+
+      - name: Hardened build, a case of each kind
+        run: |
+          make clean && make harden
+          for c in zwork/x2+1 zwork/hod_4d_k3 zwork/pinn_taylorgreen; do
+            ( cd $c && sed -i 's/^Epoch .*/Epoch      3 \//' input_nn.dat \
+                    && ../../build/serial.out > /dev/null )
+          done
+
+      - name: Library and C interface
+        run: make clean && make lib && make shared && make c_example.out
+
+      - name: Reproduction inputs are present
+        run: python3 tools/repro_check.py
+
+      - name: Shipped results still match the paper
+        run: python3 tools/verify_results.py
+
+      - name: The golden file matches an independent Taylor jet
+        run: python3 tools/make_hod_golden.py zwork/hod_4d_k3

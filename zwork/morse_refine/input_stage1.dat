@@ -1,0 +1,48 @@
+### Stage one of the refinement experiment: forces only.
+###
+### This is what a conventional machine-learned force field is fitted to.
+### Energies and forces are what a first-principles calculation gives up
+### cheaply; third and fourth derivatives are not.  The stage is here to
+### produce a force field of the ordinary kind, so that the next stage
+### can ask what high-order information adds to one.
+###
+### Measured against the analytic Morse values, the result is a good
+### force field by the usual standard and a poor one by the standard that
+### matters for anharmonic phonons: the forces come out at a relative
+### error of 0.03, the harmonic constants at 0.07, but the cubic
+### anharmonicity at 0.44 and the quartic at 1.2, the latter meaning no
+### information at all.
+###
+### Run this first; stage two restarts from the weights it writes.
+Init_w       Glorot_norm
+Rand_seed    20260805 /
+Restart      0 /
+Output_deriv 1 /   the carried slots are the quantity of interest here
+
+Nlayer       4 / L
+6 / ndim(1) = the six atomic positions
+24 /
+24 /
+1 / ndim(L)
+
+Loss_term  HOD_DATA  240  train.dat  1.d0 /
+
+Hod_K      4 /
+0.d0            / lambda_0, the energy: not taught, see below
+1.61487370d+00  / lambda_1, the forces
+0.d0            / lambda_2, not taught in this stage
+0.d0            / lambda_3, not taught in this stage
+0.d0            / lambda_4, not taught in this stage
+Hod_dense  1 /
+
+Hod_check  1 /
+Num_validation 40 /
+Validation_cyc 500 /
+P_max          2000 /
+Epoch      4000 /
+Activation TANH /
+Conv       1.d-14 /
+Num_batch  20 /
+Checkpoint_cyc 100000 /
+GD_method  Adam
+GD_param   0.002d0 0.9d0 0.999d0 1.d-8 0.d0 /

@@ -1,0 +1,120 @@
+### Section 5.7 with Section 5.4's decoupled variant: forgetting fixed at
+### one and a node-wise covariance.
+###
+### An electrohydrodynamic system: five field components over two
+### variables, coupled the way a discharge-driven wind is.
+###
+### >>> READ THIS BEFORE RUNNING THIS FILE <<<
+### The optimizer below is the per-pattern Kalman filter, and on THIS
+### system it is measured to diverge (2.8e-3 -> 1.44 in 50 epochs from
+### a fitted start; the mechanism is the forgetting factor, see
+### zwork/FLOW_CASES.md).  The file is kept in that state on purpose:
+### it is the case the divergence was characterized on, and the term
+### table below is the reference for the system.  It is NOT the way to
+### solve this problem, which is why it is no longer input_nn.dat.
+### To run it anyway:  cp input_kalman_divergence.dat input_nn.dat
+### To solve the system, use instead, in the same directory:
+###
+###   input_cold.dat      full-batch L-BFGS from random weights:
+###                       0.974 -> 3.9e-4 in 900 epochs (~250 s),
+###                       R2 >= 0.9977 in all five components
+###   input_cold_ngd.dat  minibatch dual natural gradient with
+###                       per-residual Gauss-Newton rows: 0.743 ->
+###                       9.1e-4 in 900 epochs, for collocation sets
+###                       too large to hold in one batch
+###   input_fit.dat       supervised fit to the manufactured solution,
+###                       the starting point for optimizer studies
+###
+### To make the filter behave here at all, fix the forgetting factor
+### (GD_param p2 = p3 = 1) and add Kalman_mode DECOUPLED.
+###
+###   R1  lap(phi) + rho/eps                                = 0
+###   R2  u.grad(rho) - mu div(rho grad phi) - D lap(rho)    = S_rho
+###
+### The divergence of the drift flux expands to
+###   div(rho grad phi) = grad(rho).grad(phi) + rho lap(phi),
+### and the first of those is a product of two first derivatives of
+### different components, which is what the DXD form is for.  Writing it
+### as rho times lap(phi) alone, which is the mistake that looks
+### plausible, drops a term the equation needs.
+###   R3  u.grad(u) + p_x - nu lap(u) + c rho phi_x          = S_u
+###   R4  u.grad(v) + p_y - nu lap(v) + c rho phi_y          = S_v
+###   R5  u_x + v_y                                          = 0
+###
+### The coupling runs both ways and that is the point: the charge acted
+### on by the field is a body force on the fluid (c rho phi_x), and the
+### flow carries the charge (u rho_x + v rho_y).  Every one of those
+### terms multiplies one component by the derivative of another, so none
+### of them can be written with a scalar residual.
+###
+### Components: 1 phi, 2 rho, 3 u, 4 v, 5 p.
+### The solution is manufactured, so it is known exactly:
+###   phi = sin x sin y     rho = cos x cos y + 1/2
+###   u   = -cos x sin y    v   = sin x cos y
+###   p   = -(cos 2x + cos 2y)/4
+### Poisson and continuity need no source; the other three carry one,
+### supplied per residual in colloc.dat.
+Init_w       Glorot_norm
+Rand_seed    20260812 /
+Restart      0 /
+Output_deriv 0 /
+
+Nlayer       4 /
+2 / (x, y)
+48 /
+48 /
+5 / (phi, rho, u, v, p)
+
+Loss_term  COLLOCATION  1200  colloc.dat  1.d-1 /
+
+Sys_wcomp  4.0583 2.0211 3.9327 3.9998 16.0352 /   1/||y_i||^2
+
+Sys_src /   colloc.dat carries one source column per residual
+
+System 5 25 /
+TRM  1  1   2 0   1.d0    /   phi_xx
+TRM  1  1   0 2   1.d0    /   phi_yy
+TRM  1  2   0 0   1.d0    /   + rho/eps  (eps = 1)
+XUX  2  3 2 1 0   1.d0    /   u * rho_x
+XUX  2  4 2 0 1   1.d0    /   v * rho_y
+DXD  2  2 1 0  1 1 0  -0.5d0  /   -mu rho_x phi_x
+DXD  2  2 0 1  1 0 1  -0.5d0  /   -mu rho_y phi_y
+DXD  2  2 0 0  1 2 0  -0.5d0  /   -mu rho phi_xx
+DXD  2  2 0 0  1 0 2  -0.5d0  /   -mu rho phi_yy
+TRM  2  2   2 0  -0.1d0   /   -D rho_xx
+TRM  2  2   0 2  -0.1d0   /   -D rho_yy
+XUX  3  3 3 1 0   1.d0    /   u * u_x
+XUX  3  4 3 0 1   1.d0    /   v * u_y
+TRM  3  5   1 0   1.d0    /   p_x
+TRM  3  3   2 0  -0.1d0   /   -nu u_xx
+TRM  3  3   0 2  -0.1d0   /   -nu u_yy
+XUX  3  2 1 1 0   0.2d0   /   + c rho phi_x
+XUX  4  3 4 1 0   1.d0    /   u * v_x
+XUX  4  4 4 0 1   1.d0    /   v * v_y
+TRM  4  5   0 1   1.d0    /   p_y
+TRM  4  4   2 0  -0.1d0   /   -nu v_xx
+TRM  4  4   0 2  -0.1d0   /   -nu v_yy
+XUX  4  2 1 0 1   0.2d0   /   + c rho phi_y
+TRM  5  3   1 0   1.d0    /   u_x
+TRM  5  4   0 1   1.d0    /   v_y
+
+Exact_solution 1 /   colloc.dat carries the exact five components at the end
+
+Hod_K      2 /
+1.d0
+0.d0
+0.d0
+Hod_dense  1 /
+
+Hod_check  0 /
+Num_validation 100 /
+Validation_cyc 20 /
+P_max          4000 /
+Epoch      2000 /
+Activation TANH /
+Conv       1.d-14 /
+Num_batch  40 /
+Checkpoint_cyc 100000 /
+GD_method  KALMAN
+GD_param   1.d-3 1.d0 1.d0 0.d0 0.d0 /
+Kalman_mode DECOUPLED /

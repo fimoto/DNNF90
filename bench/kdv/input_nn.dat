@@ -1,0 +1,32 @@
+### PINN benchmark [kdv] KdV: u = sech^2(0.5(x-t)), x in [-8,8], t in [0,2]
+Rand_seed    20260728 / fixed seed (reproducibility)
+Output_deriv 1 /
+Init_w       LeCun_unif
+Restart      0 /
+Nlayer       4 / L
+2 /
+16 /
+16 /
+1 /
+###
+Loss_term  DATA         100  data.dat           1.d0 /
+Loss_term  COLLOCATION     200  colloc.dat         0.2d0 /
+###
+Residual 3 /
+LIN   1.d0        0 1 /  u_t
+UUX   3.d0        1 0 /  A u u_x (A=3)
+LIN   1.d0        3 0 /  u_3x
+Exact_solution 1 /
+Hod_check 1 /
+###
+Num_validation 30 /
+Validation_cyc 200 /
+P_max          1000000 /
+###
+Epoch      60000 /
+Activation TANH /
+Conv       1.d-14 /
+Num_batch  270 /
+Checkpoint_cyc         100000 /
+GD_method  Adam
+GD_param   0.003d0 0.9d0 0.999d0 1.d-8 0.d0 /

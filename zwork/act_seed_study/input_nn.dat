@@ -1,0 +1,32 @@
+### High-order derivative training demo: D0=4, K=3 (35 targets/point)
+### target u(x) = prod_i sin(omega_i x_i + phi_i);  see ../../tools/gen_hod_train.f90
+Output_deriv 1 / write output_hod.datXXXX at the end
+Init_w       Glorot_unif
+Rand_seed    20260801 / fixed seed (reproducibility)
+Restart      0 /
+Nlayer       4 / L
+4  / ndim(1) = number of input variables D0
+10 /
+10 /
+1  / ndim(L) = 1 (required for MATH_HOD)
+###
+Loss_term  HOD_DATA     400  train.dat          1.d0 /
+###
+Hod_K 3 / max derivative order K; K+1 lambda lines follow (p=0..K)
+1.d0  / lambda_0 (function value)
+1.d0  / lambda_1
+1.d0  / lambda_2
+1.d0  / lambda_3
+Hod_check 1 / run [G][F][W] self-tests before fitting
+###
+Num_validation 40 /
+Validation_cyc 200 /
+P_max          10000 /
+###
+Epoch      3000 /
+Activation TANH / required for MATH_HOD
+Conv       1.d-10 /
+Num_batch  20 /
+Checkpoint_cyc         1000 /
+GD_method  Adam
+GD_param   0.003d0 0.9d0 0.999d0 1.d-8 0.d0 /

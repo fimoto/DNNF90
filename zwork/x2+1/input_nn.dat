@@ -1,0 +1,28 @@
+### f(x)=x^2+1 regression demo (MATH form), updated to the current keyword set
+### (old keys N_val/val_cyc/Mbatch/Eval_weight/GD_param-1-value are obsolete)
+Output_deriv 0 /
+Init_w       Glorot_norm  ! fan-in scaled: Random_unif is a fixed +-0.05 range and cannot drive five hidden layers
+Rand_seed  20260729 / fixed seed (reproducibility)
+ Restart      0 /
+Nlayer       7 / L
+1  / ndim(1)
+10 /
+10 /
+10 /
+10 /
+10 /
+1  / ndim(L)
+###
+Loss_term  DATA         200  train.dat          1.d0 /
+###
+Num_validation 10 /
+Validation_cyc 100 /
+P_max          500 /
+###
+Epoch      20000 /
+Activation TANH /
+Conv       5.7d-6 /
+Num_batch  10 /
+Checkpoint_cyc         1000 /
+GD_method  Simple
+GD_param   0.1d0 0.d0 0.d0 0.d0 0.d0 /

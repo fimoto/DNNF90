@@ -1,0 +1,21 @@
+# Python packages the reproduction scripts import.  Everything else they
+# use (math, statistics, ctypes, ...) is in the standard library.
+#
+#   python3 -m pip install -r requirements-repro.txt
+#
+# Versions are the ones the shipped results were produced with; the
+# scripts do not depend on new APIs, so later versions should work.
+
+# figures and tables (bench/post/*.py, zwork/*/summarise.py)
+numpy>=1.24
+matplotlib>=3.7
+
+# the exact-solution checks (bench/post/check_*.py) and the coefficient
+# derivations; only needed to re-verify the manufactured solutions
+sympy>=1.12
+mpmath>=1.3
+
+# ONLY for the framework comparison of Table 2, which times PyTorch and
+# JAX against this code.  Not needed for any other figure or table.
+# torch==2.13.0
+# jax==0.11.0

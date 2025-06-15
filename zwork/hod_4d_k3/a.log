@@ -1,0 +1,74 @@
+### init_hod_tables
+###   D0=4  K=3
+###   NUM_alpha (multi-indices carried) = 35
+###   Bell table terms                  = 104
+### High-order derivative (HOD) training enabled
+Hod_K  3
+Hod_lambda(0:K)    0.100E+01  0.100E+01  0.100E+01  0.100E+01
+Hod_alpha_file  NONE
+Hod_check  1
+Task  TRAIN
+Average_cyc_mpi  1
+Shuffle  0
+Shuffle_cyc_mpi  1000000
+Output_deriv  1
+Restart  0
+
+********************
+Network Construction
+Nlayer  4
+           4
+          10
+          10
+           1
+********************
+Number of weight parameters  171
+
+All input  400
+Training  360
+Validation  40
+********************
+Label_start & Label_end
+           1         400
+Ndata_train_set(i) & label_end(i)-label_start(i)+1
+         400         400
+********************
+Early Stopping
+NUM_validation  40
+val_cyc  200
+p_max: maximum patience for early stopping  10000
+********************
+Epoch  3000
+Conv    0.10E-09
+********************
+Regularization
+********************
+
+Activation  TANH           
+
+Sample number in a minibatch (Mbatch)  20
+
+Output Cycle (OC)  1000
+Initialization  GLOROT_UNIF    
+GD_method  ADAM                          
+GD_param     0.0030000000   0.9000000000   0.9990000000   0.0000000100   0.0000000000   0.0000000000
+GD_ratio
+   1.0000000000
+
+#############################################
+### HOD self-check
+### [REF] golden regression: 35 values, max |T - golden| =   0.69389E-17
+### [REF] passed
+###     worst slot 15 of order 2:  T, FD = -0.881301E-03 -0.881301E-03
+### [dX] input FD check (|alpha|<=2): max rel |T - FD| =   0.10503E-07
+### [dX] passed
+### [dW] weight-gradient FD check: 43 weights, max relative error =   0.49689E-10
+### [dW] passed
+### HOD self-check: ALL PASSED
+#############################################
+start from total epoch: istart_step=  0
+ best epoch=        3000   3.6926563827389546E-003
+ writing output_set*.dat for 400 points
+               3.787[s]
+     0.063[min]
+     0.001[h]

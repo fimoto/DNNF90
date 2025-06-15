@@ -1,0 +1,90 @@
+Note: The following floating-point exceptions are signalling: IEEE_UNDERFLOW_FLAG IEEE_DENORMAL
+### init_hod_tables
+###   D0=2  K=3
+###   NUM_alpha (multi-indices carried) = 5
+###   Bell table terms                  = 7
+###   restricted to closure of 3 seed indices
+### PINN residual training enabled
+Pinn_residual terms (after DXLAP expansion)  3
+  LIN  c=  0.100000E+01  alpha=  3  0
+  UUX  c=  0.100000E+01  alpha=  1  0
+  LIN  c=  0.100000E+01  alpha=  0  1
+Pinn_exact  1
+### High-order derivative (HOD) training enabled
+Hod_k  3
+Hod_lambda(0:K)    0.100E+01  0.100E+01  0.100E+01  0.100E+01
+Hod_alpha_file  NONE
+Hod_check  1
+Task  TRAIN  
+Average_cyc_mpi  1
+Shuffle  0
+Shuffle_cyc_mpi  1000000
+Calc_deriv  1
+Restart  0
+gd_param(0)     0.00000
+
+
+********************
+Network Construction
+Nlayer  4
+           2
+          16
+          16
+           1
+********************
+Number of weight parameters  337
+
+All input  300
+Training  270
+Validation  30
+********************
+Label_start & Label_end
+           1         100
+         101         300
+Ndata_train_set(i) & label_end(i)-label_start(i)+1
+         100         100
+         200         200
+********************
+Early Stopping
+NUM_validation  30
+val_cyc  200
+p_max: maximum patience for early stopping  100000
+********************
+Epoch  20000
+Conv    0.10E-11
+********************
+Regularization
+********************
+
+Activation  TANH           
+tanh
+
+Sample number in a minibatch (Mbatch)  20
+
+Output Cycle (OC)  2000
+Initialization  LECUN_UNIF     
+GD_method  ADAM                          
+GD_param     0.0030000000   0.9000000000   0.9990000000   0.0000000100   0.0000000000   0.0000000000
+GD_ratio
+   1.0000000000
+   0.2000000000
+
+#############################################
+### HOD self-check
+### [G] hod_golden.dat not found: skipped
+### [F] input FD check (|alpha|<=2): max |T - FD| =   0.70436E-08
+### [F] passed
+### [W] weight-gradient FD check: 43 weights, max relative error =   0.41688E-10
+### [W] passed
+### [P] PINN residual-gradient FD check: 43 weights, max relative error =   0.17618E-12
+### [P] passed
+### HOD self-check: ALL PASSED
+#############################################
+start from total epoch: istart_step=  0
+ best epoch=       19400   7.5765150002571139E-006
+ output.dat,NUM_input=         300
+
+ err=   6.1837832236684445E-005
+               7.915[s]
+     0.132[min]
+     0.002[h]

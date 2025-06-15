@@ -1,0 +1,90 @@
+### init_hod_tables
+###   D0=2  K=2
+###   NUM_alpha (multi-indices carried) = 6
+###   Bell table terms                  = 8
+### Residual as parsed (imposed as R = 0 at every collocation point)
+###   axes are written x1..x2, with axis 2 shown as t (Time_axis)
+###   term      coefficient  expression                    slot  multi-index
+###    1      1.000000E+00  u_x1x1                            4    2  0
+###    2      1.000000E+00  u_tt                              6    0  2
+###  src     -1.000000E+00  f(x)  (a column of the collocation file)
+###
+### PINN residual training enabled
+Residual terms (after DXLAP expansion)  2
+Exact_solution  1
+Time_axis  2
+### High-order derivative (HOD) training enabled
+Hod_K  2
+Hod_lambda(0:K)    0.100E+01  0.000E+00  0.000E+00
+Hod_alpha_file  NONE
+Hod_check  1
+Task  TRAIN
+Average_cyc_mpi  1
+Shuffle  0
+Shuffle_cyc_mpi  1000000
+Output_deriv  1
+Restart  0
+
+********************
+Network Construction
+Nlayer  4
+           2
+          20
+          20
+           1
+********************
+Number of weight parameters  501
+
+All input  560
+Training  530
+Validation  30
+********************
+Label_start & Label_end
+           1         160
+         161         560
+Ndata_train_set(i) & label_end(i)-label_start(i)+1
+         160         160
+         400         400
+********************
+Early Stopping
+NUM_validation  30
+val_cyc  20
+p_max: maximum patience for early stopping  500
+********************
+Epoch  300
+Conv    0.10E-11
+********************
+Regularization
+********************
+
+Activation  TANH           
+
+Sample number in a minibatch (Mbatch)  40
+
+Output Cycle (OC)  100
+Initialization  GLOROT_NORM    
+GD_method  KALMAN                        
+GD_param     0.0100000000   0.9800000000   0.9995000000   0.0000000000   0.0000000000   0.0000000000
+GD_ratio
+   1.0000000000
+   0.0010000000
+
+#############################################
+### HOD self-check
+### [REF] hod_golden.dat not found: skipped
+###     worst slot 3 of order 1:  T, FD =  0.473796E-01  0.473796E-01
+### [dX] input FD check (|alpha|<=2): max rel |T - FD| =   0.61037E-08
+### [dX] passed
+### [dW] weight-gradient FD check: 43 weights, max relative error =   0.82055E-11
+### [dW] passed
+### [dW-R] PINN residual-gradient FD check: 43 weights, max relative error =   0.11157E-07
+### [dW-R] passed
+### HOD self-check: ALL PASSED
+#############################################
+start from total epoch: istart_step=  0
+### Kalman filter: 501 weights, covariance      2.0 MB
+ best epoch=         300   5.4878696880941586E-010
+ writing output_set*.dat for 560 points
+               9.003[s]
+     0.150[min]
+     0.003[h]

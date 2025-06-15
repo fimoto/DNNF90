@@ -1,0 +1,67 @@
+### init_hod_tables
+###   D0=2  K=2
+###   NUM_alpha (multi-indices carried) = 6
+###   Bell table terms                  = 8
+### High-order derivative (HOD) training enabled
+Hod_K  2
+Hod_lambda(0:K)    0.100E+01  0.000E+00  0.000E+00
+Hod_alpha_file  NONE
+Hod_check  0
+Task  TRAIN
+Average_cyc_mpi  1
+Shuffle  0
+Shuffle_cyc_mpi  1000000
+Output_deriv  0
+Restart  0
+
+********************
+Network Construction
+Nlayer  5
+           2
+          40
+          40
+          40
+           3
+********************
+Number of weight parameters  3523
+
+All input  5000
+Training  4800
+Validation  200
+********************
+Label_start & Label_end
+           1        1000
+        1001        5000
+Ndata_train_set(i) & label_end(i)-label_start(i)+1
+        1000        1000
+        4000        4000
+********************
+Early Stopping
+NUM_validation  200
+val_cyc  100
+p_max: maximum patience for early stopping  20000
+********************
+Epoch  2000
+Conv    0.10E-13
+********************
+Regularization
+********************
+
+Activation  TANH           
+
+Sample number in a minibatch (Mbatch)  100
+
+Output Cycle (OC)  100000
+Initialization  GLOROT_NORM    
+GD_method  ADAM                          
+GD_param     0.0020000000   0.9000000000   0.9990000000   0.0000000100   0.0000000000   0.0000000000
+GD_ratio
+   1.0000000000
+   0.0100000000
+
+start from total epoch: istart_step=  0
+ best epoch=        2000   1.6687545064964268E-003
+ writing output_set*.dat for 5000 points
+              17.831[s]
+     0.297[min]
+     0.005[h]

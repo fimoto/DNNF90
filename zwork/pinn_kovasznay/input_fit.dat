@@ -1,0 +1,55 @@
+### Stage 1 of the two-stage flow procedure: fit the network to the
+### exact Kovasznay solution over the collocation cloud (plus the
+### boundary data), with the residual weight tiny.  The result is
+### fitted_weight.dat, the start of the PINN run in input_nn.dat.
+Init_w       Glorot_norm
+Rand_seed    20260822 /
+Restart      0 /
+Output_deriv 0 /
+
+Nlayer       5 /
+2 / (x, y)
+40 /
+40 /
+40 /
+3 / (u, v, p)
+
+Loss_term  DATA         3000  colloc.dat  1.d0  /
+Loss_term  DATA          480  data.dat    1.d0  /
+Loss_term  COLLOCATION  3000  colloc.dat  1.d-12 /
+
+Sys_wcomp  0.688 103.1 8.68 /   1/||y_i||^2 from the data
+
+System 3 12 /
+TRM  1  1   1 0   1.d0    /   u_x
+TRM  1  2   0 1   1.d0    /   v_y
+XUX  2  1 1 1 0   1.d0    /   u * u_x
+XUX  2  2 1 0 1   1.d0    /   v * u_y
+TRM  2  3   1 0   1.d0    /   p_x  (rho = 1)
+TRM  2  1   2 0  -2.5d-2  /   -nu u_xx
+TRM  2  1   0 2  -2.5d-2  /   -nu u_yy
+XUX  3  1 2 1 0   1.d0    /   u * v_x
+XUX  3  2 2 0 1   1.d0    /   v * v_y
+TRM  3  3   0 1   1.d0    /   p_y
+TRM  3  2   2 0  -2.5d-2  /   -nu v_xx
+TRM  3  2   0 2  -2.5d-2  /   -nu v_yy
+
+Hod_K      2 /
+1.d0
+0.d0
+0.d0
+Exact_solution 1 /   colloc.dat carries u*, v*, p*
+
+Hod_dense  1 /
+
+Hod_check  0 /
+Num_validation 200 /
+Validation_cyc 100 /
+P_max          200000 /
+Epoch      20000 /
+Activation TANH /
+Conv       1.d-14 /
+Num_batch  100 /
+Checkpoint_cyc 1000000 /
+GD_method  Adam
+GD_param   0.002d0 0.9d0 0.999d0 1.d-8 0.d0 /

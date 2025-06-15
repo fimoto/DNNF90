@@ -1,0 +1,13 @@
+# DNNF90 training history: one row per validation event
+#  1:epoch  2:patience
+#  3:cost_train    4:cost_val    5:cost_input   (per point;
+#    the composite objective, Loss_term weights applied --
+#    the same sum the optimizer descends)
+#  6:cost_train_f  7:cost_train_df  8:cost_val_f  9:cost_val_df
+# 10:cost_input_f 11:cost_input_df
+# 12:rmse_train_f 13:rmse_train_df 14:rmse_val_f 15:rmse_val_df
+# 16:rmse_input_f 17:rmse_input_df
+# 18:mae_train_f  19:mae_train_df  20:mae_val_f  21:mae_val_df
+# 22:mae_input_f  23:mae_input_df
+# 24..: the same 21 metrics for each loss term in turn (2 terms: columns 24-44 are term 1, 45-65 term 2, ...)
+1  0    0.29000E+00    0.87385E-01    0.27158E+00    0.28741E+00    0.25981E+04    0.85821E-01    0.15642E+04    0.26908E+00    0.25041E+04    0.10040E+01    0.72084E+02    0.89818E+00    0.55932E+02    0.99488E+00    0.70768E+02    0.80706E+00    0.20567E+02    0.70357E+00    0.26501E+02    0.79766E+00    0.21107E+02    0.50719E+00    0.25746E+00    0.49331E+00    0.50719E+00    0.00000E+00    0.25746E+00    0.00000E+00    0.49331E+00    0.00000E+00    0.10072E+01    0.00000E+00    0.71758E+00    0.00000E+00    0.99329E+00    0.00000E+00    0.79005E+00    0.00000E+00    0.54125E+00    0.00000E+00    0.77623E+00    0.00000E+00    0.59955E-02    0.23463E-02    0.55089E-02    0.00000E+00    0.59955E+04    0.00000E+00    0.23463E+04    0.00000E+00    0.55089E+04    0.99995E+00    0.10950E+03    0.97602E+00    0.68502E+02    0.99680E+00    0.10497E+03    0.82931E+00    0.47463E+02    0.78473E+00    0.39751E+02    0.82336E+00    0.46435E+02

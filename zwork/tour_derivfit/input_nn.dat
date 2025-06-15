@@ -1,0 +1,26 @@
+### Keyword tour: derivative fitting via a K=1 high-order term.
+### Loss = 0.6*value-fit + 0.4*derivative-fit (Hod_lambda 0.6, 0.4);
+### the model output derivative dy/dx is written by Output_deriv 1.
+Output_deriv 1 /
+Init_w       Glorot_norm
+Rand_seed    20260731 /
+Restart      0 /
+Nlayer       4 / L
+1  /
+12 /
+12 /
+1  /
+Hod_K      1 /
+0.6d0
+0.4d0
+Loss_term  HOD_DATA     200  train_hod.dat      1.d0 /
+Num_validation 20 /
+Validation_cyc 50 /
+P_max          500 /
+Epoch      1500 /
+Activation TANH /
+Conv       1.d-9 /
+Num_batch  180 /
+Checkpoint_cyc         500 /
+GD_method  ADAM
+GD_param   0.01d0 0.9d0 0.999d0 1.d-8 0.d0 /

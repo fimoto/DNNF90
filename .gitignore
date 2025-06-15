@@ -1,0 +1,85 @@
+# private working notes: these are development records, not
+# documentation, and are deliberately not part of the repository.
+# docs/VERIFICATION.md carries the durable results instead.
+docs/STATE.md
+HANDOVER.md
+
+# build products
+build/
+
+# Run outputs are ignored by default, because a working tree fills with
+# them, but the ones the paper is built from are tracked explicitly.  A
+# reader who clones the repository must get the same reference results
+# the tarball carries, so every negation below is deliberate: if a
+# figure or a table is made from a file, that file is tracked.
+history_ep*.dat
+output_set*.dat
+output_deriv_set*.dat
+output_hod_set*.dat
+checkpoint_ep*.dat
+gd_*.dat
+weight_new.dat
+nn_weight.dat
+data_division.log
+hod_alpha_order.dat
+learning_rate_eta.log
+diag_part_mu.log
+*.log
+
+# ---- reference results the manuscript is built from ----
+!bench/*/nn_weight.dat
+!bench/*/history_ep*.dat
+!bench/*/output_set*.dat
+!bench/*/a_reference.log
+!bench/*/a.log
+!bench/figs/
+!zwork/*/nn_weight.dat
+!zwork/*/history_ep*.dat
+!zwork/*/output_set*.dat
+!zwork/*/output_hod_set*.dat
+!zwork/*/a_reference.log
+!zwork/*/a.log
+# reference runs kept beside a case, one level deeper
+!zwork/*/*/
+!zwork/*/*/nn_weight.dat
+!zwork/*/*/history_ep*.dat
+!zwork/*/*/output_set*.dat
+!zwork/*/*/output_hod_set*.dat
+!zwork/*/*/a.log
+
+# The per-seed studies write one run directory per (seed, activation).
+# Their tables are built from per_seed.csv and summary.txt, which the
+# aggregators write and which are tracked; the run directories are not,
+# because they hold tens of megabytes of derivative dumps that only a
+# rerun of the study needs, and a rerun regenerates them.
+zwork/act_seed_study/run_*/
+zwork/hod_4d_k7_order7/study_*/
+!zwork/act_seed_study/summary.txt
+!zwork/act_seed_study/per_seed.csv
+# the seventh-order study: the runner, the aggregator and the per-seed
+# table the paper's seventh-order table is made from
+zwork/hod_4d_k7_order7/run_*/
+!zwork/hod_4d_k7_order7/per_seed.csv
+!zwork/hod_4d_k7_order7/summary.txt
+zwork/pinn_cosh7/run_*/
+!zwork/pinn_cosh7/per_seed.csv
+!zwork/pinn_cosh7/summary.txt
+
+# Full derivative dumps.  These are the largest files the trainer writes
+# (one row per point, one column per carried derivative), and only one
+# case needs one tracked: hod_4d_k3, whose accuracy table is made from
+# it.  Everywhere else they are reproduced by rerunning the case; the
+# refinement figure, for instance, runs the three arms of morse_refine
+# first, as the README of that directory describes.
+output_hod_set*.dat
+output_deriv_set*.dat
+!zwork/hod_4d_k3/output_hod_set*.dat
+# and the 600-byte column index that file is read with, so that a fresh
+# clone can run bench/post/hod_accuracy.py and tools/make_hod_golden.py
+# without training the case first.  Elsewhere the index is regenerated
+# byte for byte by tools/alpha_order.py.
+!zwork/hod_4d_k3/hod_alpha_order.dat
+__pycache__/
+*.pyc
+*.mod
+*.o

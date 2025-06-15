@@ -1,0 +1,68 @@
+### Section 6: tanh on the seventh-derivative-only fit at 1x the rate the
+### case was tuned at.  The four files span the hundredfold scan the text
+### reports; run_lr_scan.sh runs them and prints the losses.
+###
+### Teaching one derivative order and nothing else.
+###
+### The same data and network as hod_4d_k7, with lambda_p = 0 for every
+### order but the seventh.  The loss is then
+###
+###   L = (1/2) sum_n sum_{|alpha|=7} ( T^alpha(x_n) - y_{n,alpha} )^2
+###
+### and the value, the gradient and every intermediate order are free.
+###
+### The point of the case is to isolate what an activation can represent
+### at high order.  In the other settings that question is masked: at
+### K = 3 the orders are shallow enough that every activation copes; with
+### the Taylor weights lambda_p = 1/(p!)^2 the seventh order carries a
+### weight of 4e-8 and is barely optimised at all; and in a collocation
+### run the residual constrains only one combination of orders, so
+### individual derivatives can be wrong while the residual is small.
+### Here the seventh order is the whole objective.
+###
+### Measured with bench/post/hod_accuracy.py, the relative error at order
+### seven is about 1.0 for tanh, which means the model carries no
+### information there and its amplitude collapses to half the target,
+### against about 0.25 for the Bessel activations, whose derivative
+### sequence is bounded at every order.  Raising the tanh learning rate a
+### hundredfold does not close the gap: it saturates at 0.193 in the loss
+### against 0.013 to 0.067 for Bessel at the default rate.
+###
+### The value is unconstrained here by construction, so output_set0001
+### will disagree with its targets; that is the setting, not a failure.
+### High-order derivative corner case: D0=4, K=7 (330 targets/point, dense)
+### self-check [G][F][W] plus a short training run
+Output_deriv 1 /
+Init_w       LeCun_unif
+Rand_seed    20260802 / fixed seed (reproducibility)
+Restart      0 /
+Nlayer       4 / L
+4 / ndim(1)
+6 /
+6 /
+1 / ndim(L)
+###
+Loss_term  HOD_DATA      60  train.dat          1.d0 /
+###
+Hod_K 7 / K; the K+1 lambda lines follow
+0.d0  / lambda_0 = 0, this order is not taught
+0.d0  / lambda_1 = 0, this order is not taught
+0.d0  / lambda_2 = 0, this order is not taught
+0.d0  / lambda_3 = 0, this order is not taught
+0.d0  / lambda_4 = 0, this order is not taught
+0.d0  / lambda_5 = 0, this order is not taught
+0.d0  / lambda_6 = 0, this order is not taught
+1.d0  / lambda_7 = 1, the only order taught
+Hod_check 1 /
+###
+Num_validation 10 /
+Validation_cyc 100 /
+P_max          10000 /
+###
+Epoch      10000 /
+Activation TANH /
+Conv       1.d-10 /
+Num_batch  10 /
+Checkpoint_cyc         100 /
+GD_method  Adam
+GD_param   0.002d0 0.9d0 0.999d0 1.d-8 0.d0 /

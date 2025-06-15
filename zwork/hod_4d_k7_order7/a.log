@@ -1,0 +1,74 @@
+Note: The following floating-point exceptions are signalling: IEEE_UNDERFLOW_FLAG IEEE_DENORMAL
+### init_hod_tables
+###   D0=4  K=7
+###   NUM_alpha (multi-indices carried) = 330
+###   Bell table terms                  = 16779
+### High-order derivative (HOD) training enabled
+Hod_K  7
+Hod_lambda(0:K)    0.000E+00  0.000E+00  0.000E+00  0.000E+00  0.000E+00  0.000E+00  0.000E+00  0.100E+01
+Hod_alpha_file  NONE
+Hod_check  1
+Task  TRAIN
+Average_cyc_mpi  1
+Shuffle  0
+Shuffle_cyc_mpi  1000000
+Output_deriv  1
+Restart  0
+
+********************
+Network Construction
+Nlayer  4
+           4
+           6
+           6
+           1
+********************
+Number of weight parameters  79
+
+All input  60
+Training  50
+Validation  10
+********************
+Label_start & Label_end
+           1          60
+Ndata_train_set(i) & label_end(i)-label_start(i)+1
+          60          60
+********************
+Early Stopping
+NUM_validation  10
+val_cyc  100
+p_max: maximum patience for early stopping  10000
+********************
+Epoch  10000
+Conv    0.10E-09
+********************
+Regularization
+********************
+
+Activation  TANH           
+
+Sample number in a minibatch (Mbatch)  10
+
+Output Cycle (OC)  100
+Initialization  LECUN_UNIF     
+GD_method  ADAM                          
+GD_param     0.0020000000   0.9000000000   0.9990000000   0.0000000100   0.0000000000   0.0000000000
+GD_ratio
+   1.0000000000
+
+#############################################
+### HOD self-check
+### [REF] hod_golden.dat not found: skipped
+###     worst slot 6 of order 2:  T, FD = -0.113852E-02 -0.113852E-02
+### [dX] input FD check (|alpha|<=2): max rel |T - FD| =   0.66133E-08
+### [dX] passed
+### [dW] weight-gradient FD check: 43 weights, max relative error =   0.91514E-07
+### [dW] passed
+### HOD self-check: ALL PASSED
+#############################################
+start from total epoch: istart_step=  0
+ best epoch=        9900  0.20469652191702983     
+ writing output_set*.dat for 60 points
+              59.704[s]
+     0.995[min]
+     0.017[h]

@@ -1,0 +1,32 @@
+### Plain-training speed comparison at width 768 (see job.sh).
+### Same conditions as the manuscript table: 7 layers, tanh, float64,
+### one thread, full batch (Num_batch = NUM_train = 190), plain SGD.
+### The steady-state epoch cost is the 50-vs-5-epoch slope.
+Rand_seed 20260731 /
+### f(x)=x^2+1 regression demo (MATH form), updated to the current keyword set
+### (old keys N_val/val_cyc/Mbatch/Eval_weight/GD_param-1-value are obsolete)
+Output_deriv 0 /
+Init_w       Random_unif
+Restart      0 /
+Nlayer       7 / L
+1  / ndim(1)
+768 /
+768 /
+768 /
+768 /
+768 /
+1  / ndim(L)
+###
+Loss_term  DATA         200  train.dat          1.d0 /
+###
+Num_validation 10 /
+Validation_cyc 100 /
+P_max          500 /
+###
+Epoch      5 /
+Activation TANH /
+Conv       5.7d-6 /
+Num_batch  190 /
+Checkpoint_cyc         1000 /
+GD_method  Simple
+GD_param   0.1d0 0.d0 0.d0 0.d0 0.d0 /

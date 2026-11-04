@@ -154,10 +154,8 @@ The distribution verifies itself in five independent ways.
 
 ## Citation
 
-If this code is useful in your work, please cite the accompanying manuscript [https://doi.org/10.48550/arXiv.2609.03768].
-The original code base was developed for the doctoral thesis of F. Imoto, 
-"Development of Orbital-Free Density Functional Theory with Machine Learning and Its Applications", The University of Tokyo (2019) and 
-Phys. Rev. Research 3, 033198 (2021) [https://doi.org/10.1103/PhysRevResearch.3.033198].; the present version is a substantially modified version of it.
+Please cite Phys. Rev. Research 3, 033198 (2021) [https://doi.org/10.1103/PhysRevResearch.3.033198] and a preprint that explains the implementation of DNNF90 [https://doi.org/10.48550/arXiv.2609.03768].
+The original code base was developed for the doctoral thesis of F. Imoto, "Development of Orbital-Free Density Functional Theory with Machine Learning and Its Applications", The University of Tokyo (2019); the present version is a substantially modified version of it.
 
 ## License
 

@@ -20,12 +20,20 @@
 // dL/dw_1 are printed so that a run is evidently a real computation;
 // they can be checked against bench/post/refvals (see README).
 //
-//   g++ -O2 -std=c++17 -I xad/src -I xad/bld/src -o xad_bench \
-//       xad_bench.cpp -L xad/bld/lib -lxad
+//   g++ -O3 -std=c++17 -I xad/src -I xad/bld/src -o xad_bench \
+//       xad_bench.cpp xad_tape_higher.cpp
 //   ./xad_bench <K> <npoints> <repeat>
 //
-// Orders 1..7 are instantiated; the payload doubles per level, so
-// compile time and memory grow with the maximum order built.
+// (Do not link -lxad; see xad_tape_higher.cpp.)  Orders 1..7 are
+// instantiated; the payload doubles per level, so compile time and the
+// size of a tape entry grow with the maximum order built.  The tape
+// chunks are sized in bytes by xad_bench_config.hpp; with XAD's default
+// sizing, constructing a tape at K = 6 or 7 reserves several GB.
+//
+// One tape is constructed per run and cleared before every repetition, so each
+// repetition records the full tape but does not time the tape's
+// construction and destruction (CoDiPack's benchmark likewise resets
+// its global tape).
 
 #include <chrono>
 #include <cmath>
@@ -33,6 +41,7 @@
 #include <cstdlib>
 #include <vector>
 
+#include "xad_bench_config.hpp"  // before XAD.hpp
 #include <XAD/XAD.hpp>
 
 static const int D0 = 4, W = 8;
@@ -93,8 +102,9 @@ double run(const std::vector<double> &w, const std::vector<double> &xs,
   using Tape = xad::Tape<F>;
   using A = xad::AReal<F>;
 
+  Tape tape;
   auto one = [&](bool report) {
-    Tape tape;
+    tape.clearAll();
     std::vector<A> wt(NW);
     for (int i = 0; i < NW; ++i) {
       wt[i] = w[i];

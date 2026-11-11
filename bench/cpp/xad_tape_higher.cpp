@@ -7,9 +7,10 @@
 // XAD's own Tape.cpp (so the standard instantiations come from here --
 // do NOT also link libxad) and adds the deeper stacks.
 //
-//   g++ -O2 -std=c++17 -I <xad>/src -I <xad>/bld/src \
+//   g++ -O3 -std=c++17 -I <xad>/src -I <xad>/bld/src \
 //       -o xad_bench xad_bench.cpp xad_tape_higher.cpp
 
+#include "xad_bench_config.hpp"  // before XAD.hpp, as in xad_bench.cpp
 #include <XAD/XAD.hpp>
 #include <Tape.cpp>
 

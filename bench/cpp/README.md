@@ -49,15 +49,24 @@ benchmark compiles XAD's `Tape.cpp` inside `xad_tape_higher.cpp` and
 adds the deeper stacks -- do **not** also link `-lxad`, or the standard
 instantiations are duplicated:
 
-    git clone --depth 1 https://github.com/auto-differentiation/xad.git
-    cmake -S xad -B xad/bld -DCMAKE_BUILD_TYPE=Release -DXAD_ENABLE_TESTS=OFF
+    git clone --depth 1 --branch v2.2.0 https://github.com/auto-differentiation/xad.git
+    cmake -S xad -B xad/bld -DCMAKE_BUILD_TYPE=Release -DXAD_ENABLE_TESTS=OFF \
+        -DXAD_USE_STRONG_INLINE=ON -DXAD_NO_THREADLOCAL=ON \
+        -DXAD_COPY_ELISION=ON -DXAD_REDUCED_MEMORY=ON
     make -C xad/bld
-    g++ -O2 -std=c++17 -I xad/src -I xad/bld/src -o xad_bench \
+    g++ -O3 -std=c++17 -I xad/src -I xad/bld/src -o xad_bench \
         xad_bench.cpp xad_tape_higher.cpp
     ./xad_bench <order> <npoints> <repeat>
 
-Orders 6 and 7 throw `std::bad_alloc` on a 4 GB machine: the payload
-doubles per level and the tape no longer fits.
+-O3 matches ADOL-C (CMake Release) and the Fortran code. The XAD
+options are its speed options for this benchmark: strong inlining, a
+global (not thread-local) tape, copy elision and reduced tape memory.
+
+All seven orders run. XAD reserves tape storage in chunks of 8 Mi
+entries, and an entry here holds 2^K doubles, so the first chunk alone
+is 8.7 GB at K = 7 for a 6.5 MB tape. `xad_bench_config.hpp` sizes
+these chunks in bytes instead (64 MB; `-DXAD_BENCH_CHUNK_BYTES` to
+change).
 
 ADOL-C is built with CMake and needs C++20 for its headers:
 
